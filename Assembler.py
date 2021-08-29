@@ -15,6 +15,11 @@ rom_contents = []
 pass_num = 0
 needs_another_pass = False
 
+# For reg widths
+a16 = False
+xy16 = False
+
+
 def addsym(sym, val):
     global symbol_table
 
@@ -30,7 +35,7 @@ def getsym(sym):
         print(f"Found symbol: {sym}") # DEBUG
         return symbol_table[sym].val
     
-    print(f"[WARN] Unknown symbol '{sym}' on line {line_num}, going for another pass...")
+    print(f"[INFO] Unknown symbol '{sym}' on line {line_num}, going for another pass...")
     needs_another_pass = True
     return SYMVALUNK
 
@@ -39,7 +44,7 @@ def symexists(sym):
     return sym in symbol_table
 
 def writerom8(addr, octet):
-    if octet > 0xff or octet < 0:  # FIXME ----------------------------------------------------------------------------------
+    if octet > 0xff or octet < 0:
         print(f"[WARN] Value outside range [0..0xff] on line {line_num}")
     global rom_offset
     global rom_contents
@@ -47,7 +52,7 @@ def writerom8(addr, octet):
 
 
 def writerom16(addr, word):
-    if word > 0xffff or word < 0:  # FIXME ----------------------------------------------------------------------------------
+    if word > 0xffff or word < 0:
         print(f"[WARN] Value outside range [0..0xffff] on line {line_num}")
     writerom8(addr, word & 0x00ff)           # Lowbyte
     writerom8(addr+1, (word & 0xff00) >> 8)  # Highbyte
@@ -61,23 +66,45 @@ def parsenum(str):
         print(f"[ERROR] Expected operand on line {line_num}")
         exit(-1)
 
+    shift = 0
+    mask = 0xffffffff
+    so = 0          # Selection Offset
+
+    # Check for byte selection operators
+    if str[0] == "<":
+        so = 1
+        mask = 0xff
+    elif str[0] == ">":
+        so = 1
+        shift = 8
+        mask = 0xff
+    elif str[0] == "^":
+        so = 1
+        shift = 16
+        mask = 0xff
+
+    val = 0
     try:
-        if str[0].isdigit():
-            return int(str, base=10)
-        elif len(str) > 1:
-            if str[0] == "$":
-                return int(str[1:], base=16)
-            elif str[0] == "%":
-                return int(str[1:], base=2)
-            elif str[0].lower() == "o":
-                return int(str[1:], base=8)
-            elif str[0] == "{":
-                return parsepostfixnum(str[1:])
-            return getsym(str)
-        raise ValueError()
+        if str[so].isdigit():
+            val = int(str, base=10)
+        elif len(str) > so+1:
+            if str[so] == "$":
+                val = int(str[so+1:], base=16)
+            elif str[so] == "%":
+                val = int(str[so+1:], base=2)
+            elif str[so].lower() == "o":
+                val = int(str[so+1:], base=8)
+            elif str[so] == "{":
+                val = parsepostfixnum(str[so+1:])
+            else:
+                val = getsym(str)
+        else:
+            raise ValueError()
     except ValueError:
         print(f"[ERROR] Invalid number format on line {line_num} : {str}")
         exit(-1)
+
+    return (val >> shift) & mask
 
 # Returns the result of a prefix-notation expression. String must be enclosed in "{}"
 def parsepostfixnum(str):
@@ -106,7 +133,7 @@ def parsepostfixnum(str):
             elif num == "-":
                 num1 = args.pop()
                 num2 = args.pop()
-                args.append(num2 - num1) # CHECK ORDERING OF OPERANDS -------------------------------------------------------------------------
+                args.append(num2 - num1)
             elif num == "*":
                 args.append(args.pop() * args.pop())
             elif num == "/":
@@ -127,7 +154,7 @@ def parsepostfixnum(str):
                 args.append(num2 << num1)
             else:
                 arg = parsenum(num)
-                print(f"arg: {arg} | num: {num}") # DEBUG
+                # print(f"arg: {arg} | num: {num}") # DEBUG
                 
                 # Still waiting for symbol value to be resolved, go for another pass
                 if arg == SYMVALUNK:
@@ -135,8 +162,6 @@ def parsepostfixnum(str):
                     return SYMVALUNK
                 
                 args.append(arg)
-
-                print(args)
             
     except IndexError:
         print(f"[ERROR] Missing value or extra operation on line {line_num}")
@@ -146,7 +171,49 @@ def parsepostfixnum(str):
     exit(-1)
 
 # Parses arguments to an instruction
-def parseargs(i, line):
+def parseargs(i, line, sym):
+    print(f"ARGS: {line[i:]}")
+
+    global a16
+    global xy16
+    global line_num
+
+    operand = line[i:].strip().rsplit(';', 1)[0] # Ignore comments (using rsplit)
+    instruction = Instructions.INSTRUCTIONS[sym.upper()]
+
+    # Immedant addressing
+    if operand[0] == "#":
+
+        if instruction.immd == -1:
+            print(f"[ERROR] Illegal addressing mode on line {line_num}")
+            exit(-1)
+
+        val = parsenum(operand[1:])
+
+        print(instruction.immd)
+
+        returnbytes = [ instruction.immd, val & 0xff ]
+
+        # Check if value is 8 or 16 bit
+        if (instruction.reg == "A" and a16) or (instruction.reg == "XY" and xy16):
+            returnbytes.append((val >> 8) & 0xff)
+        elif val > 0xff:
+            print(f"[WARN] Value is > 0xff with 8 bit reg on line {line_num}")
+
+        return returnbytes
+            
+    if operand[0] == "(":
+        pass
+
+    # Operand is nust an address:
+
+
+
+
+    # for form in Instructions.INSTRUCTION_FORMAT:
+    #     if form.match(operand):
+    #         print(f"Found arg format: {form.regex}")
+
     pass
 
 
@@ -159,6 +226,8 @@ def parseline(line):
     global line_num
     global pass_num
     global needs_another_pass
+    global a16
+    global xy16
 
     line = line.strip()
     if (line == ""): 
@@ -168,8 +237,11 @@ def parseline(line):
     prev_sym = ""
 
     i = 0
-    while i < len(line):
-        c = line[i]
+    while i <= len(line):
+        if i < len(line):
+            c = line[i]
+        else: 
+            c = ""
 
         # print(f"Char: {c}\tSymbol: {sym}")
         if c.isalnum() or c == '_':
@@ -193,8 +265,7 @@ def parseline(line):
                 # It is the ROM directive
                 if sym.lower() == "rom":
                     if (rom_size != 0):
-                        print(
-                            f"[ERROR] Unexpected ROM directive on line {line_num}")
+                        print(f"[ERROR] Unexpected ROM directive on line {line_num}")
                         exit(-1)
 
                     rom_size = parsenum(line[i+1:])
@@ -202,12 +273,13 @@ def parseline(line):
 
             # All remaining passes then fill in data to the ROM array
             else:
-
                 # Check for instrucions
                 if sym.upper() in Instructions.INSTRUCTIONS:
 
                     print("YES, found instruction")  # DEBUG
-                    parseargs(i, line)
+                    for byte in parseargs(i, line, sym):
+                        writerom8(pc, byte)
+                        pc += 1
 
                 # Ignore comments
                 elif sym[0] == ";":
@@ -257,11 +329,38 @@ def parseline(line):
                     addsym(prev_sym, val)
                     i = len(line)   # Done with line
 
+                # ROM directive, ignored on pass != 1
+                elif sym.lower() == "rom":
+                    i = len(line)   # Done with line
+
+                # Register width directives
+                elif sym.lower() == "a16":
+                    a16 = True
+                    i = len(line)   # Done with line
+                elif sym.lower() == "xy16":
+                    xy16 = True
+                    i = len(line)   # Done with line
+                elif sym.lower() == "axy16":
+                    a16 = True
+                    xy16 = True
+                    i = len(line)   # Done with line
+                elif sym.lower() == "a8":
+                    a16 = False
+                    i = len(line)   # Done with line
+                elif sym.lower() == "xy8":
+                    xy16 = False
+                    i = len(line)   # Done with line
+                elif sym.lower() == "axy8":
+                    a16 = False
+                    xy16 = False
+                    i = len(line)   # Done with line
+
                 # Unknown
                 else:
-                    print("Unknown")  # DEBUG
+                    print(f"Unknown: {sym}")  # DEBUG
                     prev_sym = sym
-            
+
+
             sym = ""
 
         elif c in [' ', '\t', '.']:
@@ -287,19 +386,22 @@ if __name__ == "__main__":
     
     with open("test.asm", "r") as file:
         
-        while pass_num < 3 or needs_another_pass:
+        while pass_num < 2 or needs_another_pass:
             pass_num += 1
             line_num = 0
             needs_another_pass = False
+            a16 = False
+            xy16 = False
             print(f"[INFO] *** Starting pass #{pass_num} ***")
 
             for line in file.readlines():
                 line_num += 1
-                print(line)
+                if line.strip() != "": # DEBUG
+                    print(line) # DEBUG
                 parseline(line)
-                print(f"PC: {pc}")  # DEBUG
-                print(f"ROM OFFSET: {rom_offset}")  # DEBUG
-                print(f"ROM SIZE: {rom_size}")  # DEBUG
+                # print(f"PC: {pc}")  # DEBUG
+                # print(f"ROM OFFSET: {rom_offset}")  # DEBUG
+                # print(f"ROM SIZE: {rom_size}")  # DEBUG
             
             if pass_num == 1:
                 for i in range(rom_size):

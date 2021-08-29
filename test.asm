@@ -13,8 +13,8 @@ mylabel:
 
     .org o7754
     ldy #0
-    ldx #myvar
-    adc $2673
+    xy16
+    ldx #{ myvar 600 + }
     sta ($f050),y
 
     .dw { 5 myvar 2 * + myothervar - firstvar + }
@@ -22,3 +22,4 @@ mylabel:
     .dw $a0f5
     DB $0f, 50, "Hello!", $00
     
+    adc #$2673
