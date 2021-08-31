@@ -1,6 +1,10 @@
 
+# Local imports
 import Instructions
 import Symbols
+
+# Libraries
+import re
 
 symbol_table = {}
 SYMVALUNK = 0xffffffff
@@ -50,16 +54,108 @@ def writerom8(addr, octet):
     global rom_contents
     rom_contents[addr-rom_offset] = octet
 
-
 def writerom16(addr, word):
     if word > 0xffff or word < 0:
         print(f"[WARN] Value outside range [0..0xffff] on line {line_num}")
     writerom8(addr, word & 0x00ff)           # Lowbyte
     writerom8(addr+1, (word & 0xff00) >> 8)  # Highbyte
 
+# Takes an instruction's address mode value and prints an error (and exits) if the address mode is not valid
+# Returns the instruction's opcode value if valid
+def checkreturnaddrmode(instruction_mode):
+    global line_num
+    # print(f"IS {(instruction_mode):04X}") # DEBUG
+    if (instruction_mode < 0):
+        print(f"[ERROR] Invalid addressing mode on line {line_num}")
+        exit(-1)
+    return instruction_mode
+
+# Takes a string and returns the bytes for an instruction based on its addressing mode for an address or immediate data
+def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
+    global line_num
+    global needs_another_pass
+
+    mo = 0
+    addr_mode_force = 0
+    if operand[0] == "<":
+        mo = 1
+        addr_mode_force = 1
+    elif operand[0] in ["!", "|"]:
+        mo = 1
+        addr_mode_force = 2
+    elif operand[0] == ">":
+        mo = 1
+        addr_mode_force = 3
+
+    val = parsenum(operand[mo:])
+
+    # Value contains an unresolved symbol, assume an addressing mode
+    if val == -1:
+        if addr_mode_force == 0:
+            print(f"[ERROR] Forward reference or unresolved symbol on line {line_num}, please force an addressing mode")
+            exit(-1)
+        else:
+            needs_another_pass = True
+
+    returnbytes = []
+
+    if (val < 0x000100 and val >= 0 and addr_mode_force == 0 and instruction_d != -1) or addr_mode_force == 1:
+        returnbytes.append(checkreturnaddrmode(instruction_d))
+        returnbytes.append(val & 0xff)
+    elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) or addr_mode_force == 2:
+        returnbytes.append(checkreturnaddrmode(instruction_a))
+        returnbytes.append((val >> 8) & 0xff)
+        returnbytes.append(val & 0xff)
+    elif (val <= 0xffffff and val >= 0x010000 and addr_mode_force == 0 and instruction_l != -1) or addr_mode_force == 3:
+        returnbytes.append(checkreturnaddrmode(instruction_l))
+        returnbytes.append((val >> 16) & 0xff)
+        returnbytes.append((val >> 8) & 0xff)
+        returnbytes.append(val & 0xff)
+    else:
+        checkreturnaddrmode(-1)  # Error and exit
+
+    return returnbytes
+
+# Calculates the branch offset for an 8-bit relative operation
+def calcrel8(from_addr, to_addr):
+    global line_num
+
+    offset = to_addr - from_addr
+
+    if from_addr < to_addr:
+        if offset > 0x7F:
+            print(f"[ERROR] Branch out of range ({offset:02X} > +0x7F) on line {line_num}")
+            exit(-1)
+    else:
+        if offset < -0x80:
+            print(f"[ERROR] Branch out of ranve ({offset:02X} < -0x80) on line {line_num}")
+            exit(-1)
+    return offset & 0xFFFF
+
+
+# Calculates the branch offset for an 16-bit relative operation
+def calcrel16(from_addr, to_addr):
+    global line_num
+
+    offset = to_addr - from_addr
+
+    if from_addr < to_addr:
+        if offset > 0x7FFF:
+            print(
+                f"[ERROR] Branch out of range ({offset:04X} > +0x7FFF) on line {line_num}")
+            exit(-1)
+    else:
+        if offset < -0x8000:
+            print(
+                f"[ERROR] Branch out of ranve ({offset:04X} < -0x8000) on line {line_num}")
+            exit(-1)
+    return offset & 0xFFFF
+
+
 # Returns the value of the number contained in str. Whitespace padding is permitted
 def parsenum(str):
     global symbol_table
+    global line_num
 
     str = str.strip()
     if len(str) < 1:
@@ -87,7 +183,7 @@ def parsenum(str):
     try:
         if str[so].isdigit():
             val = int(str, base=10)
-        elif len(str) > so+1:
+        elif len(str) > so:
             if str[so] == "$":
                 val = int(str[so+1:], base=16)
             elif str[so] == "%":
@@ -172,25 +268,27 @@ def parsepostfixnum(str):
 
 # Parses arguments to an instruction
 def parseargs(i, line, sym):
-    print(f"ARGS: {line[i:]}")
+    # print(f"ARGS: {line[i:]}")
 
     global a16
     global xy16
     global line_num
+    global pc
 
-    operand = line[i:].strip().rsplit(';', 1)[0] # Ignore comments (using rsplit)
+    operand = line[i:].rsplit(';', 1)[0].strip() # Ignore comments (using rsplit)
     instruction = Instructions.INSTRUCTIONS[sym.upper()]
 
-    # Immedant addressing
+    # Implied
+    if len(operand) == 0:
+        return [ instruction.impd ]
+
+    # Immediate addressing
     if operand[0] == "#":
 
         if instruction.immd == -1:
-            print(f"[ERROR] Illegal addressing mode on line {line_num}")
-            exit(-1)
+            checkreturnaddrmode(-1)  # Error and exti
 
         val = parsenum(operand[1:])
-
-        print(instruction.immd)
 
         returnbytes = [ instruction.immd, val & 0xff ]
 
@@ -202,19 +300,68 @@ def parseargs(i, line, sym):
 
         return returnbytes
             
+    # Indirect
     if operand[0] == "(":
+
+        match = re.search(",\W*(x|X)\W*\)$", operand)
+        if match:
+            return getopcodebytes(operand[1:match.span()[0]], instruction.idrctx, instruction.iabsx, -1)
+        match = re.search(",\W*(s|S)\W*\)\W*,\W*(y|Y)$", operand)
+        if match:
+            return getopcodebytes(operand[1:match.span()[0]], instruction.istacksy, -1, -1)
+        match = re.search("\)\W*,\W*(y|Y)$", operand)
+        if match:
+            return getopcodebytes(operand[1:match.span()[0]], instruction.idrcty, instruction.iabsy, -1)
+        if re.search("\)$", operand):
+            return getopcodebytes(operand[1:-1], instruction.idrct, instruction.iabs, -1)
+        
+        checkreturnaddrmode(-1)  # Error and exit
+        
+    # Indirect long
+    if operand[0] == "[":
+
+        match = re.search("]\W*,\W*(y|Y)$", operand)
+        if match:
+            return getopcodebytes(operand[1:match.span()[0]], instruction.ildrcty, -1, -1)
+        elif re.search("]$", operand):
+            return getopcodebytes(operand[1:-1], instruction.ildrct, instruction.ilabs, -1)
+        else:
+            checkreturnaddrmode(-1)  # Error and exit
+        
+    # Y-indexed
+    match = re.search(",\W*(y|Y)$", operand)
+    if match:
+        return getopcodebytes(operand[:match.span()[0]], instruction.drcty, instruction.absy, -1)
+    
+    # X-indexed
+    match = re.search(",\W*(x|X)$", operand)
+    if match:
+        return getopcodebytes(operand[:match.span()[0]], instruction.drctx, instruction.absx, instruction.longx)
+
+    # Stack addressing
+    match = re.search(",\W*(s|S)$", operand)
+    if match:
+        return getopcodebytes(operand[:match.span()[0]], instruction.stacks, -1, -1)
+
+    # Relative addressing
+    if instruction.rel8 != -1:
+        return [ instruction.rel8, calcrel8(pc+2, parsenum(operand)) ]
+
+    # Relative long
+    if instruction.rel16 != -1:
+        return [ instruction.rel16, calcrel16(pc+3, parsenum(operand)) ]
+
+    # Block move
+    match = re.search(",", operand)
+    if match:
+        src_bank = parsenum(operand[:match.span()[0]-1])
+        des_bank = parsenum(operand[match.span()[1]:])
+        return [instruction.srcdes, src_bank, des_bank ]
         pass
 
-    # Operand is nust an address:
+    # Operand must be an address:
+    return getopcodebytes(operand, instruction.drct, instruction.absu, instruction.lng)
 
-
-
-
-    # for form in Instructions.INSTRUCTION_FORMAT:
-    #     if form.match(operand):
-    #         print(f"Found arg format: {form.regex}")
-
-    pass
 
 
 # Parses a single line
@@ -276,10 +423,12 @@ def parseline(line):
                 # Check for instrucions
                 if sym.upper() in Instructions.INSTRUCTIONS:
 
-                    print("YES, found instruction")  # DEBUG
+                    # print("YES, found instruction")  # DEBUG
                     for byte in parseargs(i, line, sym):
                         writerom8(pc, byte)
                         pc += 1
+
+                    i = len(line)   # Done with line
 
                 # Ignore comments
                 elif sym[0] == ";":
@@ -367,14 +516,17 @@ def parseline(line):
             # Whitespace resets symbol being parsed
             sym = ""
         else:
-            print("ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")  # DEBUG
+            # print("ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")  # DEBUG
+            pass
         
         i += 1
 
 def printsymtable():
+    global symbol_table
+    
     print("[INFO] Symbol table:")
-    sorted(symbol_table.keys())
-    for sym in symbol_table:
+    sorted_sym_table = sorted(symbol_table.keys())
+    for sym in sorted_sym_table:
         val = symbol_table[sym].val
         if val == SYMVALUNK:
             print(f"     * {sym.ljust(24)}: ?????????")
@@ -396,8 +548,8 @@ if __name__ == "__main__":
 
             for line in file.readlines():
                 line_num += 1
-                if line.strip() != "": # DEBUG
-                    print(line) # DEBUG
+                # if line.strip() != "": # DEBUG
+                #     print(line) # DEBUG
                 parseline(line)
                 # print(f"PC: {pc}")  # DEBUG
                 # print(f"ROM OFFSET: {rom_offset}")  # DEBUG
