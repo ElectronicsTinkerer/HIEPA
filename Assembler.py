@@ -6,7 +6,8 @@ import Symbols
 # Libraries
 import re
 
-symbol_table = {}
+re_symbol_table = {}
+un_symbol_table = {}
 SYMVALUNK = 0xffffffff
 
 MAX_PASSES = 7
@@ -20,32 +21,63 @@ pass_num = 0
 needs_another_pass = False
 
 # For reg widths
-a16 = False
-xy16 = False
+al = False
+xl = False
 
 
-def addsym(sym, val):
-    global symbol_table
+def addsym(sym, val, exp):
+    global re_symbol_table
+    global un_symbol_table
 
-    if (sym in symbol_table and symbol_table[sym].val == SYMVALUNK) or (sym not in symbol_table):
-        symbol_table[sym] = Symbols.Symbol(sym, val)
-        
+    if val == SYMVALUNK:
+        un_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
+    else:
+        re_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
+
+        if sym in un_symbol_table:
+            un_symbol_table.pop(sym)
+
+
 def getsym(sym):
     global needs_another_pass
-    global symbol_table
+    global re_symbol_table
+    global un_symbol_table
     global line_num
 
-    if sym in symbol_table:
-        print(f"Found symbol: {sym}") # DEBUG
-        return symbol_table[sym].val
+    if sym in re_symbol_table:
+        # print(f"Found resolved symbol: {sym}") # DEBUG
+        return re_symbol_table[sym].val
+
+    elif sym in un_symbol_table:
+        # print(f"Found unresolved symbol: {sym}") # DEBUG
+        return un_symbol_table[sym].val
     
-    print(f"[INFO] Unknown symbol '{sym}' on line {line_num}, going for another pass...")
+    print(f"[INFO] Unknown symbol '{sym}' on line {line_num}, going for another pass ...")
     needs_another_pass = True
     return SYMVALUNK
 
-def symexists(sym):
-    global symbol_table
-    return sym in symbol_table
+# Attempts to resolve a symbol. If successful, symbol is moved to re_symbol_table
+def tryresolvesym(sym):
+    global un_symbol_table
+    global re_symbol_table
+
+    if sym in re_symbol_table:
+        return -1
+
+    if sym not in un_symbol_table:
+        print("[ERROR] Internal error, unable to find sym in unresolved table during resolution.\nContact someone (probably me) to fix this!")
+        exit(-1)
+
+    exp = un_symbol_table[sym].exp
+    val = parsenum(exp)
+
+    if val != SYMVALUNK:
+        re_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
+        un_symbol_table.pop(sym)
+        return 1
+
+    return 0
+
 
 def writerom8(addr, octet):
     if octet > 0xff or octet < 0:
@@ -54,11 +86,13 @@ def writerom8(addr, octet):
     global rom_contents
     rom_contents[addr-rom_offset] = octet
 
+
 def writerom16(addr, word):
     if word > 0xffff or word < 0:
         print(f"[WARN] Value outside range [0..0xffff] on line {line_num}")
     writerom8(addr, word & 0x00ff)           # Lowbyte
     writerom8(addr+1, (word & 0xff00) >> 8)  # Highbyte
+
 
 # Takes an instruction's address mode value and prints an error (and exits) if the address mode is not valid
 # Returns the instruction's opcode value if valid
@@ -69,6 +103,7 @@ def checkreturnaddrmode(instruction_mode):
         print(f"[ERROR] Invalid addressing mode on line {line_num}")
         exit(-1)
     return instruction_mode
+
 
 # Takes a string and returns the bytes for an instruction based on its addressing mode for an address or immediate data
 def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
@@ -90,19 +125,17 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
     val = parsenum(operand[mo:])
 
     # Value contains an unresolved symbol, assume an addressing mode
-    if val == -1:
+    if val == SYMVALUNK:
         if addr_mode_force == 0:
-            print(f"[ERROR] Forward reference or unresolved symbol on line {line_num}, please force an addressing mode")
-            exit(-1)
-        else:
-            needs_another_pass = True
+            print(f"[WARN] Forward reference or unresolved symbol on line {line_num}, defaulting to absolute addressing")
+        needs_another_pass = True
 
     returnbytes = []
 
     if (val < 0x000100 and val >= 0 and addr_mode_force == 0 and instruction_d != -1) or addr_mode_force == 1:
         returnbytes.append(checkreturnaddrmode(instruction_d))
         returnbytes.append(val & 0xff)
-    elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) or addr_mode_force == 2:
+    elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) or addr_mode_force == 2 or (val == SYMVALUNK and instruction_a != -1):
         returnbytes.append(checkreturnaddrmode(instruction_a))
         returnbytes.append((val >> 8) & 0xff)
         returnbytes.append(val & 0xff)
@@ -154,7 +187,7 @@ def calcrel16(from_addr, to_addr):
 
 # Returns the value of the number contained in str. Whitespace padding is permitted
 def parsenum(str):
-    global symbol_table
+    global re_symbol_table
     global line_num
 
     str = str.strip()
@@ -188,7 +221,7 @@ def parsenum(str):
                 val = int(str[so+1:], base=16)
             elif str[so] == "%":
                 val = int(str[so+1:], base=2)
-            elif str[so].lower() == "o":
+            elif str[so].lower() == "&":
                 val = int(str[so+1:], base=8)
             elif str[so] == "{":
                 val = parsepostfixnum(str[so+1:])
@@ -202,7 +235,8 @@ def parsenum(str):
 
     return (val >> shift) & mask
 
-# Returns the result of a prefix-notation expression. String must be enclosed in "{}"
+
+# Returns the result of a prefix-notation expression. String must be terminated with "}"
 def parsepostfixnum(str):
     global needs_another_pass
     global line_num
@@ -263,15 +297,17 @@ def parsepostfixnum(str):
         print(f"[ERROR] Missing value or extra operation on line {line_num}")
         exit(-1)
 
+    # TODO: IS THIS NEEDED?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
     print(f"[ERROR] Unexpected end of expression on line {line_num}")
     exit(-1)
+
 
 # Parses arguments to an instruction
 def parseargs(i, line, sym):
     # print(f"ARGS: {line[i:]}")
 
-    global a16
-    global xy16
+    global al
+    global xl
     global line_num
     global pc
 
@@ -293,7 +329,7 @@ def parseargs(i, line, sym):
         returnbytes = [ instruction.immd, val & 0xff ]
 
         # Check if value is 8 or 16 bit
-        if (instruction.reg == "A" and a16) or (instruction.reg == "XY" and xy16):
+        if (instruction.reg == "A" and al) or (instruction.reg == "XY" and xl):
             returnbytes.append((val >> 8) & 0xff)
         elif val > 0xff:
             print(f"[WARN] Value is > 0xff with 8 bit reg on line {line_num}")
@@ -363,18 +399,17 @@ def parseargs(i, line, sym):
     return getopcodebytes(operand, instruction.drct, instruction.absu, instruction.lng)
 
 
-
 # Parses a single line
 def parseline(line):
     global pc
     global rom_size
     global rom_offset
-    global symbol_table
+    global re_symbol_table
     global line_num
     global pass_num
     global needs_another_pass
-    global a16
-    global xy16
+    global al
+    global xl
 
     line = line.strip()
     if (line == ""): 
@@ -406,108 +441,88 @@ def parseline(line):
                 pc = tpc        # Update PC location
                 i = len(line)   # Done with line
 
-            # First pass only finds the PC start address and ROM size
-            elif pass_num == 1:
+            # Check for instrucions
+            elif sym.upper() in Instructions.INSTRUCTIONS:
 
-                # It is the ROM directive
-                if sym.lower() == "rom":
-                    if (rom_size != 0):
-                        print(f"[ERROR] Unexpected ROM directive on line {line_num}")
-                        exit(-1)
+                # print("YES, found instruction")  # DEBUG
+                for byte in parseargs(i, line, sym):
+                    writerom8(pc, byte)
+                    pc += 1
 
-                    rom_size = parsenum(line[i+1:])
-                    i = len(line)   # Done with line
+                i = len(line)   # Done with line
 
-            # All remaining passes then fill in data to the ROM array
-            else:
-                # Check for instrucions
-                if sym.upper() in Instructions.INSTRUCTIONS:
+            # Ignore comments
+            elif sym[0] == ";":
+                i = len(line)   # Done with line
 
-                    # print("YES, found instruction")  # DEBUG
-                    for byte in parseargs(i, line, sym):
-                        writerom8(pc, byte)
+            # If it's a label, append it to the table
+            elif c == ":":
+                addsym(sym, pc, pc)
+                # print(f"Found Label: {sym} = ${pc:04X}")  # DEBUG
+
+            # DataByte directive
+            elif sym.lower() == "byt":
+                
+                # Allow comma-delimited values
+                nums = line[i+1:].split(",")
+
+                # Go over all values on line
+                for num in nums:
+                    num = num.strip()
+
+                    # Ignore comments
+                    if num[0] == ";":
+                        continue
+
+                    # Here's a string literal
+                    if num[0] == "\"":
+
+                        for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):    # Only works with values [0..127]
+                            writerom8(pc, ord(s))
+                            pc += 1
+                    
+                    # Here's a direct number
+                    else:
+                        writerom8(pc, parsenum(num))
                         pc += 1
 
-                    i = len(line)   # Done with line
+                i = len(line)   # Done with line
 
-                # Ignore comments
-                elif sym[0] == ";":
-                    i = len(line)   # Done with line
+            # DataWord directive
+            elif sym.lower() == "word":
+                writerom16(pc, parsenum(line[i+1:]))
+                pc += 2
+                i = len(line)   # Done with line                
+        
+            # Equate
+            elif sym.lower() == "equ":
+                exp = line[i:].rsplit(';', 1)[0]
+                val = parsenum(exp)
+                addsym(prev_sym, val, exp)
+                i = len(line)   # Done with line
 
-                # If it's a label, append it to the table
-                elif c == ":":
-                    addsym(sym, pc)
-                    print(f"Found Label: {sym} = ${pc:04X}")  # DEBUG
+            # ROM directive, ignored on pass != 1
+            elif sym.lower() == "rom":
+                i = len(line)   # Done with line
 
-                # DataByte directive
-                elif sym.lower() == "db":
-                    
-                    # Allow comma-delimited values
-                    nums = line[i+1:].split(",")
+            # Register width directives
+            elif sym.lower() == "al":
+                al = True
+                i = len(line)   # Done with line
+            elif sym.lower() == "xl":
+                xl = True
+                i = len(line)   # Done with line
+            elif sym.lower() == "as":
+                al = False
+                i = len(line)   # Done with line
+            elif sym.lower() == "xs":
+                xl = False
+                i = len(line)   # Done with line
 
-                    # Go over all values on line
-                    for num in nums:
-                        num = num.strip()
-
-                        # Ignore comments
-                        if num[0] == ";":
-                            continue
-
-                        # Here's a string literal
-                        if num[0] == "\"":
-                            for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):    # Only works with values [0..127]
-                                writerom8(pc, ord(s))
-                                pc += 1
-                        
-                        # Here's a direct number
-                        else:
-                            writerom8(pc, parsenum(num))
-                            pc += 1
-
-                    i = len(line)   # Done with line
-
-                # DataWord directive
-                elif sym.lower() == "dw":
-                    writerom16(pc, parsenum(line[i+1:]))
-                    pc += 2
-                    i = len(line)   # Done with line                
-            
-                # Equate
-                elif sym.lower() == "equ":
-                    val = parsenum(line[i:].rsplit(';', 1)[0])
-                    addsym(prev_sym, val)
-                    i = len(line)   # Done with line
-
-                # ROM directive, ignored on pass != 1
-                elif sym.lower() == "rom":
-                    i = len(line)   # Done with line
-
-                # Register width directives
-                elif sym.lower() == "a16":
-                    a16 = True
-                    i = len(line)   # Done with line
-                elif sym.lower() == "xy16":
-                    xy16 = True
-                    i = len(line)   # Done with line
-                elif sym.lower() == "axy16":
-                    a16 = True
-                    xy16 = True
-                    i = len(line)   # Done with line
-                elif sym.lower() == "a8":
-                    a16 = False
-                    i = len(line)   # Done with line
-                elif sym.lower() == "xy8":
-                    xy16 = False
-                    i = len(line)   # Done with line
-                elif sym.lower() == "axy8":
-                    a16 = False
-                    xy16 = False
-                    i = len(line)   # Done with line
-
-                # Unknown
-                else:
-                    print(f"Unknown: {sym}")  # DEBUG
-                    prev_sym = sym
+            # Unknown
+            else:
+                print(f"Unknown: {sym}")  # DEBUG
+                prev_sym = sym
 
 
             sym = ""
@@ -521,13 +536,14 @@ def parseline(line):
         
         i += 1
 
+
 def printsymtable():
-    global symbol_table
+    global re_symbol_table
     
     print("[INFO] Symbol table:")
-    sorted_sym_table = sorted(symbol_table.keys())
+    sorted_sym_table = sorted(re_symbol_table.keys())
     for sym in sorted_sym_table:
-        val = symbol_table[sym].val
+        val = re_symbol_table[sym].val
         if val == SYMVALUNK:
             print(f"     * {sym.ljust(24)}: ?????????")
         else:
@@ -535,6 +551,11 @@ def printsymtable():
 
 
 if __name__ == "__main__":
+
+    rom_size = parsenum("$8000") # TODO: PARSE CLI ARG for rom size (error if not given)
+
+    for i in range(rom_size):
+        rom_contents.append(0)
     
     with open("test.asm", "r") as file:
         
@@ -542,8 +563,8 @@ if __name__ == "__main__":
             pass_num += 1
             line_num = 0
             needs_another_pass = False
-            a16 = False
-            xy16 = False
+            al = False
+            xl = False
             print(f"[INFO] *** Starting pass #{pass_num} ***")
 
             for line in file.readlines():
@@ -556,8 +577,17 @@ if __name__ == "__main__":
                 # print(f"ROM SIZE: {rom_size}")  # DEBUG
             
             if pass_num == 1:
-                for i in range(rom_size):
-                    rom_contents.append(0)
+                rei = 0
+                while rei <= MAX_PASSES and len(un_symbol_table) > 0:
+                    unsymtbl = un_symbol_table.copy() # Shallow copy
+                    for sym in unsymtbl:
+                        tryresolvesym(sym)
+
+                    if rei == MAX_PASSES and len(un_symbol_table) > 0:
+                        print("[ERROR] Symbol resolver pass limit reached.")
+                        exit(-1)
+
+                    rei += 1
 
             if pass_num == MAX_PASSES:
                 print("[ERROR] Allowable passes exhausted, check for recursive or undefined symbols")

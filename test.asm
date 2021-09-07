@@ -1,6 +1,5 @@
 
     org $800
-    RoM %0001000000000000
 
 firstvar    equ { myvar aprevar myothervar myvar * + - }
 aprevar     equ { myvar 3 + }
@@ -11,18 +10,19 @@ mylabel:
 lbl:
     lda #$00
 lbl2:
-    .org o7754
+    .org &7754
 lbl3:
     ldy #0
-    xy16
-    ldx #{ myvar 600 + }
-    ldx <$f001 ; This is another comment!
+    .xl
+    ldx #{ firstvar 600 + }
+    ldx #<$f001 ; This is another comment!
     sta ($f050),y
+    asl !secondlabel
 
-    .dw { 5 myvar 2 * + myothervar - firstvar + }
-    .db $40
-    .dw $a0f5
-    DB $0f, 50, "Hello!", $00
+    .word { 5 myvar 2 * + myothervar - firstvar + }
+    .byt $40
+    .word $a0f5
+    .byt $0f, 50, "Hello!", $00
     
 secondlabel:
     adc #$2673
