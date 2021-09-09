@@ -1,11 +1,13 @@
 
 # Local imports
 import Instructions
+import Preprocessor
 import Symbols
 
 # Libraries
 import re
 
+# Assembler
 re_symbol_table = {}
 un_symbol_table = {}
 SYMVALUNK = 0xffffffff
@@ -556,45 +558,48 @@ if __name__ == "__main__":
 
     for i in range(rom_size):
         rom_contents.append(0)
+
+    file_contents = Preprocessor.preprocess("test/test.asm")  # Stores the lines of source
+
+    for line in file_contents:
+        print(line)
+
+    # exit()
     
-    with open("test.asm", "r") as file:
+    while pass_num < 2 or needs_another_pass:
+        pass_num += 1
+        line_num = 0
+        needs_another_pass = False
+        al = False
+        xl = False
+        print(f"[INFO] *** Starting pass #{pass_num} ***")
+
+        for line in file_contents:
+            line_num += 1
+            # if line.strip() != "": # DEBUG
+            #     print(line) # DEBUG
+            parseline(line)
+            # print(f"PC: {pc}")  # DEBUG
+            # print(f"ROM OFFSET: {rom_offset}")  # DEBUG
+            # print(f"ROM SIZE: {rom_size}")  # DEBUG
         
-        while pass_num < 2 or needs_another_pass:
-            pass_num += 1
-            line_num = 0
-            needs_another_pass = False
-            al = False
-            xl = False
-            print(f"[INFO] *** Starting pass #{pass_num} ***")
+        if pass_num == 1:
+            rei = 0
+            while rei <= MAX_PASSES and len(un_symbol_table) > 0:
+                unsymtbl = un_symbol_table.copy() # Shallow copy
+                for sym in unsymtbl:
+                    tryresolvesym(sym)
 
-            for line in file.readlines():
-                line_num += 1
-                # if line.strip() != "": # DEBUG
-                #     print(line) # DEBUG
-                parseline(line)
-                # print(f"PC: {pc}")  # DEBUG
-                # print(f"ROM OFFSET: {rom_offset}")  # DEBUG
-                # print(f"ROM SIZE: {rom_size}")  # DEBUG
-            
-            if pass_num == 1:
-                rei = 0
-                while rei <= MAX_PASSES and len(un_symbol_table) > 0:
-                    unsymtbl = un_symbol_table.copy() # Shallow copy
-                    for sym in unsymtbl:
-                        tryresolvesym(sym)
+                if rei == MAX_PASSES and len(un_symbol_table) > 0:
+                    print("[ERROR] Symbol resolver pass limit reached.")
+                    exit(-1)
 
-                    if rei == MAX_PASSES and len(un_symbol_table) > 0:
-                        print("[ERROR] Symbol resolver pass limit reached.")
-                        exit(-1)
+                rei += 1
 
-                    rei += 1
-
-            if pass_num == MAX_PASSES:
-                print("[ERROR] Allowable passes exhausted, check for recursive or undefined symbols")
-                printsymtable()
-                exit(-1)
-
-            file.seek(0,0) # Go to start of file for next pass
+        if pass_num == MAX_PASSES:
+            printsymtable()
+            print("[ERROR] Allowable passes exhausted, check for recursive or undefined symbols")
+            exit(-1)
 
     # Generate output binary
     with open("output.bin", "wb") as file:
