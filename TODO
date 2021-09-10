@@ -6,11 +6,11 @@
 * Add MACRO support
 * Add INClude support
 * Add remaining opcodes
+* Verify addressing mode parser (parseargs()) is still working after rewrite of instruction table
 * Add CLI args for passing ROM size, input file
-* Add #define statements to symbols
 * Add * as current PC syntax
 * Move from line numbers in assembler messages to printing the assembly line
-* Remove comment removal from Assembeler since it is not in Preprocessor
+* Remove comment removal from Assembeler since it is now in Preprocessor
 
 ## Code Improvements
 

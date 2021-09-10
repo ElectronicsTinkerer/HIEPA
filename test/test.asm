@@ -23,6 +23,8 @@ lbl3:
     sta ($f050),y
     asl !secondlabel
 
+    lda ( $3000, x )
+
     .word { 5 myvar 2 * + myothervar - firstvar + }
     .byt $40
     .word $a0f5
