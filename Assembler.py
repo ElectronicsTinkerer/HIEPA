@@ -3,6 +3,8 @@
 import Instructions
 import Preprocessor
 import Symbols
+import Msg
+from Msg import *
 
 # Libraries
 import re
@@ -25,7 +27,6 @@ needs_another_pass = False
 # For reg widths
 al = False
 xl = False
-
 
 def addsym(sym, val, exp):
     global re_symbol_table
@@ -54,7 +55,7 @@ def getsym(sym):
         # print(f"Found unresolved symbol: {sym}") # DEBUG
         return un_symbol_table[sym].val
     
-    print(f"[INFO] Unknown symbol '{sym}' on line {line_num}, going for another pass ...")
+    pmsg(INFO, f"Unknown symbol '{sym}' on line {line_num}, going for another pass ...")
     needs_another_pass = True
     return SYMVALUNK
 
@@ -67,8 +68,7 @@ def tryresolvesym(sym):
         return -1
 
     if sym not in un_symbol_table:
-        print("[ERROR] Internal error, unable to find sym in unresolved table during resolution.\nContact someone (probably me) to fix this!")
-        exit(-1)
+        pmsg(ERROR, f"Internal error, unable to find sym '{sym}' in unresolved table during resolution.\nContact someone (probably me) to fix this!")
 
     exp = un_symbol_table[sym].exp
     val = parsenum(exp)
@@ -83,7 +83,7 @@ def tryresolvesym(sym):
 
 def writerom8(addr, octet):
     if octet > 0xff or octet < 0:
-        print(f"[WARN] Value outside range [0..0xff] on line {line_num}")
+        pmsg(WARN, f"Value outside range [0..0xff] on line {line_num}")
     global rom_offset
     global rom_contents
     rom_contents[addr-rom_offset] = octet
@@ -91,7 +91,7 @@ def writerom8(addr, octet):
 
 def writerom16(addr, word):
     if word > 0xffff or word < 0:
-        print(f"[WARN] Value outside range [0..0xffff] on line {line_num}")
+        pmsg(WARN, f"Value outside range [0..0xffff] on line {line_num}")
     writerom8(addr, word & 0x00ff)           # Lowbyte
     writerom8(addr+1, (word & 0xff00) >> 8)  # Highbyte
 
@@ -102,8 +102,7 @@ def checkreturnaddrmode(instruction_mode):
     global line_num
     # print(f"IS {(instruction_mode):04X}") # DEBUG
     if (instruction_mode < 0):
-        print(f"[ERROR] Invalid addressing mode on line {line_num}")
-        exit(-1)
+        pmsg(ERROR, f"Invalid addressing mode on line {line_num}")
     return instruction_mode
 
 
@@ -129,7 +128,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
     # Value contains an unresolved symbol, assume an addressing mode
     if val == SYMVALUNK:
         if addr_mode_force == 0:
-            print(f"[WARN] Forward reference or unresolved symbol on line {line_num}, defaulting to absolute addressing")
+            pmsg(WARN, f"Forward reference or unresolved symbol on line {line_num}, defaulting to absolute addressing")
         needs_another_pass = True
 
     returnbytes = []
@@ -159,12 +158,10 @@ def calcrel8(from_addr, to_addr):
 
     if from_addr < to_addr:
         if offset > 0x7F:
-            print(f"[ERROR] Branch out of range ({offset:02X} > +0x7F) on line {line_num}")
-            exit(-1)
+            pmsg(ERROR, f"Branch out of range ({offset:02X} > +0x7F) on line {line_num}")
     else:
         if offset < -0x80:
-            print(f"[ERROR] Branch out of ranve ({offset:02X} < -0x80) on line {line_num}")
-            exit(-1)
+            pmsg(ERROR, f" Branch out of range ({offset:02X} < -0x80) on line {line_num}")
     return offset & 0xFFFF
 
 
@@ -176,14 +173,12 @@ def calcrel16(from_addr, to_addr):
 
     if from_addr < to_addr:
         if offset > 0x7FFF:
-            print(
-                f"[ERROR] Branch out of range ({offset:04X} > +0x7FFF) on line {line_num}")
-            exit(-1)
+            pmsg(ERROR,
+                f"Branch out of range ({offset:04X} > +0x7FFF) on line {line_num}")
     else:
         if offset < -0x8000:
-            print(
-                f"[ERROR] Branch out of ranve ({offset:04X} < -0x8000) on line {line_num}")
-            exit(-1)
+            pmsg(ERROR,
+                f"Branch out of range ({offset:04X} < -0x8000) on line {line_num}")
     return offset & 0xFFFF
 
 
@@ -194,8 +189,7 @@ def parsenum(str):
 
     str = str.strip()
     if len(str) < 1:
-        print(f"[ERROR] Expected operand on line {line_num}")
-        exit(-1)
+        pmsg(ERROR, f"Expected operand on line {line_num}")
 
     shift = 0
     mask = 0xffffffff
@@ -232,8 +226,7 @@ def parsenum(str):
         else:
             raise ValueError()
     except ValueError:
-        print(f"[ERROR] Invalid number format on line {line_num} : {str}")
-        exit(-1)
+        pmsg(ERROR, f"Invalid number format on line {line_num} : {str}")
 
     return (val >> shift) & mask
 
@@ -255,8 +248,7 @@ def parsepostfixnum(str):
             if num == "}":
                 val = args.pop()
                 if len(args) != 0:
-                    print(f"[ERROR] Extra symbols in expression on line {line_num}")
-                    exit(-1)
+                    pmsg(ERROR, f"Extra symbols in expression on line {line_num}")
                 return val
             
             # Perform operations on numbers
@@ -296,12 +288,10 @@ def parsepostfixnum(str):
                 args.append(arg)
             
     except IndexError:
-        print(f"[ERROR] Missing value or extra operation on line {line_num}")
-        exit(-1)
+        pmsg(ERROR, f"Missing value or extra operation on line {line_num}")
 
     # TODO: IS THIS NEEDED?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
-    print(f"[ERROR] Unexpected end of expression on line {line_num}")
-    exit(-1)
+    pmsg(ERROR, f"Unexpected end of expression on line {line_num}")
 
 
 # Parses arguments to an instruction
@@ -334,7 +324,7 @@ def parseargs(i, line, sym):
         if (instruction.reg == "A" and al) or (instruction.reg == "X" and xl):
             returnbytes.append((val >> 8) & 0xff)
         elif val > 0xff:
-            print(f"[WARN] Value is > 0xff with 8 bit reg on line {line_num}")
+            pmsg(WARN, f"Value is > 0xff with 8 bit reg on line {line_num}")
 
         return returnbytes
             
@@ -438,8 +428,7 @@ def parseline(line):
                 if pc == -1:    # On first ORG statement, set ROM offset
                     rom_offset = tpc
                 elif tpc > rom_offset + rom_size:
-                    print(f"[ERROR] ORG directive outside of ROM area on line {line_num}")
-                    exit(-1)
+                    pmsg(ERROR, f"ORG directive outside of ROM area on line {line_num}")
                 pc = tpc        # Update PC location
                 i = len(line)   # Done with line
 
@@ -557,7 +546,7 @@ def parseline(line):
 def printsymtable():
     global re_symbol_table
     
-    print("[INFO] Symbol table:")
+    pmsg(INFO, "Symbol table:")
     sorted_sym_table = sorted(re_symbol_table.keys())
     for sym in sorted_sym_table:
         val = re_symbol_table[sym].val
@@ -569,17 +558,17 @@ def printsymtable():
 
 if __name__ == "__main__":
 
+    print("HIEPA: The Highly InEfficient Python Assembler")
+    print("              for the 65816 CPU               ")
+    print("            Zach Baldwin Fall 2021            ")
+    print("")
+
     rom_size = parsenum("$8000") # TODO: PARSE CLI ARG for rom size (error if not given)
 
     for i in range(rom_size):
         rom_contents.append(0)
 
     file_contents = Preprocessor.preprocess("test/boot.asm")  # Stores the lines of source
-
-    for line in file_contents:
-        print(line)
-
-    # exit()
     
     while pass_num < 2 or needs_another_pass:
         pass_num += 1
@@ -587,7 +576,7 @@ if __name__ == "__main__":
         needs_another_pass = False
         al = False
         xl = False
-        print(f"[INFO] *** Starting pass #{pass_num} ***")
+        pmsg(INFO, f"*** Starting pass #{pass_num} ***")
 
         for line in file_contents:
             line_num += 1
@@ -606,21 +595,19 @@ if __name__ == "__main__":
                     tryresolvesym(sym)
 
                 if rei == MAX_PASSES and len(un_symbol_table) > 0:
-                    print("[ERROR] Symbol resolver pass limit reached.")
-                    exit(-1)
+                    pmsg(ERROR, "Symbol resolver pass limit reached.")
 
                 rei += 1
 
         if pass_num == MAX_PASSES:
             printsymtable()
-            print("[ERROR] Allowable passes exhausted, check for recursive or undefined symbols")
-            exit(-1)
+            pmsg(ERROR, "Allowable passes exhausted, check for recursive or undefined symbols")
 
     # Generate output binary
     with open("output.bin", "wb") as file:
         file.write(bytearray(rom_contents))
 
-    print(f"[INFO] Total Passes: {pass_num}")
+    pmsg(INFO, f"Total Passes: {pass_num}")
     
     printsymtable()
 

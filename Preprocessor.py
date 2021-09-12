@@ -1,4 +1,7 @@
 
+import Msg
+from Msg import *
+
 import re
 
 # Prepressor directive character
@@ -17,8 +20,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
     global pre_recursion_count
 
     if pre_recursion_count > PREPROC_MAX_RECUSION:
-        print("[ERROR] Max preprocessor recusion limit reached, check for recursive includes.")
-        exit(-1)
+        pmsg(ERROR, "Max preprocessor recusion limit reached, check for recursive includes.")
     pre_recursion_count += 1
 
     file_contents = []
@@ -42,6 +44,10 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 if line == "":
                     continue
 
+                # Other form of single-line comments uses '//'
+                if line.startswith("//"):
+                    continue
+
                 # */
                 if re.search(f"^\*/", line):
                     in_multi_comment = False
@@ -61,8 +67,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 if match:
                     stack.pop()
                     if len(stack) < 1:
-                        print(f"[ERROR] Extra '{PREPROC_CHAR}endif' encountered on line {line_num} of file '{filename}'")
-                        exit(-1)
+                        pmsg(ERROR, f"Extra '{PREPROC_CHAR}endif' encountered on line {line_num} of file '{filename}'")
                     continue
 
                 # IFDEF
@@ -90,8 +95,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                     try:
                         pre_defines.pop(macro)
                     except KeyError:
-                        print(f"[ERROR] Encountered '{PREPROC_CHAR}undef' but macro '{macro}' not defined. Line {line_num} of '{filename}'")
-                        exit(-1)
+                        pmsg(ERROR, f"Encountered '{PREPROC_CHAR}undef' but macro '{macro}' not defined. Line {line_num} of '{filename}'")
                     continue
 
                 # Check for includes
@@ -107,8 +111,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 if match:
                     macro = line[match.span()[1]:].split(maxsplit=1)
                     if len(macro) == 0:
-                        print(f"[ERROR] #define encountered with no macro specified on line {line_num} of '{filename}")
-                        exit(-1)
+                        pmsg(ERROR, f"#define encountered with no macro specified on line {line_num} of '{filename}")
 
                     macro_name = macro[0]
                     macro_val = ""
@@ -118,8 +121,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                     if macro_name not in pre_defines:
                         pre_defines[macro_name] = macro_val
                     else:
-                        print(f"[ERROR] Redefinition of macro '{macro_name}' on line {line_num} of '{filename}'")
-                        exit(-1)
+                        pmsg(ERROR, f"Redefinition of macro '{macro_name}' on line {line_num} of '{filename}'")
                     continue
 
                 # Nothing special, check for macros, expand them, and append line
@@ -132,13 +134,12 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
 
     except FileNotFoundError:
         if parentfilename != "":
-            print(f"[ERROR] Included file '{filename}' on line {parentlinenum} of '{parentfilename}' not found.")
+            pmsg(ERROR, f"Included file '{filename}' on line {parentlinenum} of '{parentfilename}' not found.")
         else:
-            print(f"[ERROR] File '{filename}' not found.")
+            pmsg(ERROR, f"File '{filename}' not found.")
         exit(-1)
 
     if len(stack) != 1:
-        print(f"[ERROR] Unbalanced preprocessor macros in file '{filename}'.")
-        exit(-1)
+        pmsg(ERROR, f"Unbalanced preprocessor macros in file '{filename}'.")
 
     return file_contents
