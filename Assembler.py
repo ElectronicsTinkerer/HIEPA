@@ -139,13 +139,13 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         returnbytes.append(val & 0xff)
     elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) or addr_mode_force == 2 or (val == SYMVALUNK and instruction_a != -1):
         returnbytes.append(checkreturnaddrmode(instruction_a))
-        returnbytes.append((val >> 8) & 0xff)
         returnbytes.append(val & 0xff)
+        returnbytes.append((val >> 8) & 0xff)
     elif (val <= 0xffffff and val >= 0x010000 and addr_mode_force == 0 and instruction_l != -1) or addr_mode_force == 3:
         returnbytes.append(checkreturnaddrmode(instruction_l))
-        returnbytes.append((val >> 16) & 0xff)
-        returnbytes.append((val >> 8) & 0xff)
         returnbytes.append(val & 0xff)
+        returnbytes.append((val >> 8) & 0xff)
+        returnbytes.append((val >> 16) & 0xff)
     else:
         checkreturnaddrmode(-1)  # Error and exit
 
@@ -331,7 +331,7 @@ def parseargs(i, line, sym):
         returnbytes = [ instruction.immd, val & 0xff ]
 
         # Check if value is 8 or 16 bit
-        if (instruction.reg == "A" and al) or (instruction.reg == "XY" and xl):
+        if (instruction.reg == "A" and al) or (instruction.reg == "X" and xl):
             returnbytes.append((val >> 8) & 0xff)
         elif val > 0xff:
             print(f"[WARN] Value is > 0xff with 8 bit reg on line {line_num}")
@@ -349,7 +349,7 @@ def parseargs(i, line, sym):
             return getopcodebytes(operand[1:match.span()[0]], instruction.istacksy, -1, -1)
         match = re.search("\)\W*,\W*(y|Y)$", operand)
         if match:
-            return getopcodebytes(operand[1:match.span()[0]], instruction.idrcty, instruction.iabsy, -1)
+            return getopcodebytes(operand[1:match.span()[0]], instruction.idrcty, -1, -1)
         if re.search("\)$", operand):
             return getopcodebytes(operand[1:-1], instruction.idrct, instruction.iabs, -1)
         
@@ -559,7 +559,7 @@ if __name__ == "__main__":
     for i in range(rom_size):
         rom_contents.append(0)
 
-    file_contents = Preprocessor.preprocess("test/test.asm")  # Stores the lines of source
+    file_contents = Preprocessor.preprocess("test/boot.asm")  # Stores the lines of source
 
     for line in file_contents:
         print(line)

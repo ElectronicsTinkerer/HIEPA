@@ -5,7 +5,6 @@
 * Add support for byte selection operators on 16 bit values
 * Add MACRO support
 * Add INClude support
-* Add remaining opcodes
 * Verify addressing mode parser (parseargs()) is still working after rewrite of instruction table
 * Add CLI args for passing ROM size, input file
 * Add * as current PC syntax
