@@ -34,7 +34,6 @@ rom_base:
     sta { $ff4000 2 + }
     sta $ff4000
     
-    
 loop:
     nop
     jmp loop

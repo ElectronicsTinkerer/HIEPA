@@ -18,6 +18,7 @@ MAX_PASSES = 7
 
 pc = -1
 line_num = 0
+file_contents = []
 rom_size = 0
 rom_offset = 0
 rom_contents = []
@@ -55,7 +56,7 @@ def getsym(sym):
         # print(f"Found unresolved symbol: {sym}") # DEBUG
         return un_symbol_table[sym].val
     
-    pmsg(INFO, f"Unknown symbol '{sym}' on line {line_num}, going for another pass ...")
+    pmsg(INFO, f"Unknown symbol '{sym}', going for another pass ... '{file_contents[line_num-1]}'")
     needs_another_pass = True
     return SYMVALUNK
 
@@ -68,7 +69,7 @@ def tryresolvesym(sym):
         return -1
 
     if sym not in un_symbol_table:
-        pmsg(ERROR, f"Internal error, unable to find sym '{sym}' in unresolved table during resolution.\nContact someone (probably me) to fix this!")
+        pmsg(ERROR, f"Internal error, unable to find sym '{sym}' in unresolved table during resolution.\nContact someone (probably me or your neighbor) to fix this!")
 
     exp = un_symbol_table[sym].exp
     val = parsenum(exp)
@@ -83,7 +84,7 @@ def tryresolvesym(sym):
 
 def writerom8(addr, octet):
     if octet > 0xff or octet < 0:
-        pmsg(WARN, f"Value outside range [0..0xff] on line {line_num}")
+        pmsg(WARN, f"Value outside range [0..0xff] on line '{file_contents[line_num-1]}'")
     global rom_offset
     global rom_contents
     rom_contents[addr-rom_offset] = octet
@@ -91,7 +92,7 @@ def writerom8(addr, octet):
 
 def writerom16(addr, word):
     if word > 0xffff or word < 0:
-        pmsg(WARN, f"Value outside range [0..0xffff] on line {line_num}")
+        pmsg(WARN, f"Value outside range [0..0xffff] on line '{file_contents[line_num-1]}'")
     writerom8(addr, word & 0x00ff)           # Lowbyte
     writerom8(addr+1, (word & 0xff00) >> 8)  # Highbyte
 
@@ -102,7 +103,7 @@ def checkreturnaddrmode(instruction_mode):
     global line_num
     # print(f"IS {(instruction_mode):04X}") # DEBUG
     if (instruction_mode < 0):
-        pmsg(ERROR, f"Invalid addressing mode on line {line_num}")
+        pmsg(ERROR, f"Invalid addressing mode on line '{file_contents[line_num-1]}'")
     return instruction_mode
 
 
@@ -128,7 +129,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
     # Value contains an unresolved symbol, assume an addressing mode
     if val == SYMVALUNK:
         if addr_mode_force == 0:
-            pmsg(WARN, f"Forward reference or unresolved symbol on line {line_num}, defaulting to absolute addressing")
+            pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing. '{file_contents[line_num-1]}'")
         needs_another_pass = True
 
     returnbytes = []
@@ -158,10 +159,10 @@ def calcrel8(from_addr, to_addr):
 
     if from_addr < to_addr:
         if offset > 0x7F:
-            pmsg(ERROR, f"Branch out of range ({offset:02X} > +0x7F) on line {line_num}")
+            pmsg(ERROR, f"Branch out of range ({offset:02X} > +0x7F) on line '{file_contents[line_num-1]}'")
     else:
         if offset < -0x80:
-            pmsg(ERROR, f" Branch out of range ({offset:02X} < -0x80) on line {line_num}")
+            pmsg(ERROR, f" Branch out of range ({offset:02X} < -0x80) on line '{file_contents[line_num-1]}'")
     return offset & 0xFFFF
 
 
@@ -174,11 +175,11 @@ def calcrel16(from_addr, to_addr):
     if from_addr < to_addr:
         if offset > 0x7FFF:
             pmsg(ERROR,
-                f"Branch out of range ({offset:04X} > +0x7FFF) on line {line_num}")
+                 f"Branch out of range ({offset:04X} > +0x7FFF) on line '{file_contents[line_num-1]}'")
     else:
         if offset < -0x8000:
             pmsg(ERROR,
-                f"Branch out of range ({offset:04X} < -0x8000) on line {line_num}")
+                 f"Branch out of range ({offset:04X} < -0x8000) on line '{file_contents[line_num-1]}'")
     return offset & 0xFFFF
 
 
@@ -189,7 +190,7 @@ def parsenum(str):
 
     str = str.strip()
     if len(str) < 1:
-        pmsg(ERROR, f"Expected operand on line {line_num}")
+        pmsg(ERROR, f"Expected operand on line '{file_contents[line_num-1]}'")
 
     shift = 0
     mask = 0xffffffff
@@ -226,7 +227,7 @@ def parsenum(str):
         else:
             raise ValueError()
     except ValueError:
-        pmsg(ERROR, f"Invalid number format on line {line_num} : {str}")
+        pmsg(ERROR, f"Invalid number format '{str}' on line '{file_contents[line_num-1]}'")
 
     return (val >> shift) & mask
 
@@ -248,7 +249,7 @@ def parsepostfixnum(str):
             if num == "}":
                 val = args.pop()
                 if len(args) != 0:
-                    pmsg(ERROR, f"Extra symbols in expression on line {line_num}")
+                    pmsg(ERROR, f"Extra symbols in expression on line '{file_contents[line_num-1]}'")
                 return val
             
             # Perform operations on numbers
@@ -288,10 +289,10 @@ def parsepostfixnum(str):
                 args.append(arg)
             
     except IndexError:
-        pmsg(ERROR, f"Missing value or extra operation on line {line_num}")
+        pmsg(ERROR, f"Missing value or extra operation on line '{file_contents[line_num-1]}'")
 
     # TODO: IS THIS NEEDED?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
-    pmsg(ERROR, f"Unexpected end of expression on line {line_num}")
+    pmsg(ERROR, f"Unexpected end of expression on line '{file_contents[line_num-1]}'")
 
 
 # Parses arguments to an instruction
@@ -324,7 +325,7 @@ def parseargs(i, line, sym):
         if (instruction.reg == "A" and al) or (instruction.reg == "X" and xl):
             returnbytes.append((val >> 8) & 0xff)
         elif val > 0xff:
-            pmsg(WARN, f"Value is > 0xff with 8 bit reg on line {line_num}")
+            pmsg(WARN, f"Value is > 0xff with 8 bit reg on line '{file_contents[line_num-1]}'")
 
         return returnbytes
             
@@ -428,7 +429,7 @@ def parseline(line):
                 if pc == -1:    # On first ORG statement, set ROM offset
                     rom_offset = tpc
                 elif tpc > rom_offset + rom_size:
-                    pmsg(ERROR, f"ORG directive outside of ROM area on line {line_num}")
+                    pmsg(ERROR, f"ORG directive outside of ROM area on line '{file_contents[line_num-1]}'")
                 pc = tpc        # Update PC location
                 i = len(line)   # Done with line
 
@@ -527,7 +528,8 @@ def parseline(line):
 
             # Unknown
             else:
-                print(f"Unknown: {sym}")  # DEBUG
+                if prev_sym != "":
+                    pmsg(ERROR, f"Unknown symbol '{prev_sym}' on line '{file_contents[line_num-1]}'")
                 prev_sym = sym
 
 

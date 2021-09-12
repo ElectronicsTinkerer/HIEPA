@@ -8,7 +8,6 @@
 * Verify addressing mode parser (parseargs()) is still working after rewrite of instruction table
 * Add CLI args for passing ROM size, input file
 * Add * as current PC syntax
-* Move from line numbers in assembler messages to printing the assembly line
 
 ## Code Improvements
 
