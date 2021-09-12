@@ -313,7 +313,7 @@ def parseargs(i, line, sym):
     global line_num
     global pc
 
-    operand = line[i:].rsplit(';', 1)[0].strip() # Ignore comments (using rsplit)
+    operand = line[i:].strip()
     instruction = Instructions.INSTRUCTIONS[sym.upper()]
 
     # Implied
@@ -472,10 +472,6 @@ def parseline(line):
                 for num in nums:
                     num = num.strip()
 
-                    # Ignore comments
-                    if num[0] == ";":
-                        continue
-
                     # Here's a string literal
                     if num[0] == "\"":
 
@@ -492,13 +488,32 @@ def parseline(line):
 
             # DataWord directive
             elif sym.lower() == "word":
-                writerom16(pc, parsenum(line[i+1:]))
-                pc += 2
-                i = len(line)   # Done with line                
+                
+                # Allow comma-delimited values
+                nums = line[i+1:].split(",")
+
+                # Go over all values on line
+                for num in nums:
+                    num = num.strip()
+
+                    # Here's a string literal
+                    if num[0] == "\"":
+
+                        # Only works with values [0..127]
+                        for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):
+                            writerom16(pc, ord(s))
+                            pc += 1
+
+                    # Here's a direct number
+                    else:
+                        writerom16(pc, parsenum(num))
+                        pc += 1
+
+                i = len(line)   # Done with line
         
             # Equate
             elif sym.lower() == "equ":
-                exp = line[i:].rsplit(';', 1)[0]
+                exp = line[i:]
                 val = parsenum(exp)
                 addsym(prev_sym, val, exp)
                 i = len(line)   # Done with line
