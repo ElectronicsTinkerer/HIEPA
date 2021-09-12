@@ -24,6 +24,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
     file_contents = []
 
     line_num = 0
+    in_multi_comment = False
     stack = [] # False for not included, True for included
     stack.append(True) # Start off including stuff
 
@@ -39,6 +40,20 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
 
                 # Ignore blank lines
                 if line == "":
+                    continue
+
+                # */
+                if re.search(f"^\*/", line):
+                    in_multi_comment = False
+                    continue
+
+                # /*
+                if re.search(f"^/\*", line):
+                    in_multi_comment = True
+                    continue
+
+                # Ignore anything within a multi-line comment
+                if in_multi_comment:
                     continue
 
                 # ENDIF

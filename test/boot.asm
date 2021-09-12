@@ -44,4 +44,4 @@ loop:
     
     
     ORG $FFFC
-    .byt <rom_base, >rom_base
+    .word rom_base
