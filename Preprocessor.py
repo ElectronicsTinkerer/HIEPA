@@ -55,7 +55,8 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
 
                 # /*
                 if re.search(f"^/\*", line):
-                    in_multi_comment = True
+                    if not line.endswith("*/"):
+                        in_multi_comment = True
                     continue
 
                 # Ignore anything within a multi-line comment

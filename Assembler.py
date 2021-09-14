@@ -163,7 +163,7 @@ def calcrel8(from_addr, to_addr):
     else:
         if offset < -0x80:
             pmsg(ERROR, f" Branch out of range ({offset:02X} < -0x80) on line '{file_contents[line_num-1]}'")
-    return offset & 0xFFFF
+    return offset & 0xFF
 
 
 # Calculates the branch offset for an 16-bit relative operation
@@ -385,7 +385,7 @@ def parseargs(i, line, sym):
     if match:
         src_bank = parsenum(operand[:match.span()[0]-1])
         des_bank = parsenum(operand[match.span()[1]:])
-        return [instruction.srcdes, src_bank, des_bank ]
+        return [instruction.srcdes, des_bank, src_bank ]
         pass
 
     # Operand must be an address:
@@ -492,12 +492,12 @@ def parseline(line):
                         # Only works with values [0..127]
                         for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):
                             writerom16(pc, ord(s))
-                            pc += 1
+                            pc += 2
 
                     # Here's a direct number
                     else:
                         writerom16(pc, parsenum(num))
-                        pc += 1
+                        pc += 2
 
                 i = len(line)   # Done with line
         
