@@ -239,7 +239,8 @@ def parsenum(str):
             elif str[so] == "'" or str[so] == "\"":
                 val = ord(str[so+1])
             else:
-                val = getsym(str)
+                # val = getsym(str)
+                val = parseexp(str)
         else:
             raise ValueError()
     except ValueError:
@@ -247,6 +248,92 @@ def parsenum(str):
 
     return (val >> shift) & mask
 
+
+# Parses a normal expression. Expression ends on a non symbol, ',', or ')' character
+    global needs_another_pass
+    global line_num
+
+    str = str.strip()
+
+    args = []
+
+    try:
+        # Go through elements
+        #for num in str.split(" ")
+        nums = str.split(" ")
+        i = 0
+        while i < len(nums):
+            num = nums[i]
+            if len(num) == 0:
+                i += 1
+                continue
+
+            # Check for end of expression
+            if num == "}":
+                val = args.pop()
+                if len(args) != 0:
+                    pmsg(
+                        ERROR, f"Extra symbols in expression on line '{file_contents[line_num-1]}'")
+                return val
+
+            # Perform operations on numbers
+            if num == "+":
+                args.append(args.pop() + args.pop())
+            elif num == "-":
+                num1 = args.pop()
+                num2 = args.pop()
+                args.append(num2 - num1)
+            elif num == "*":
+                args.append(args.pop() * args.pop())
+            elif num == "/":
+                num1 = args.pop()
+                num2 = args.pop()
+                args.append(num2 / num1)
+            elif num == "%":
+                num1 = args.pop()
+                num2 = args.pop()
+                args.append(num2 % num1)
+            elif num == ">>":
+                num1 = args.pop()
+                num2 = args.pop()
+                args.append(num2 >> num1)
+            elif num == "<<":
+                num1 = args.pop()
+                num2 = args.pop()
+                args.append(num2 << num1)
+            elif num == "{":
+                subxpr = " ".join(nums[i:])
+                arg = parsenum(subxpr)
+                args.append(arg)
+                bcnt = 0
+                while i < len(nums) and not (nums[i] == "}" and bcnt == 1):
+                    if nums[i] == "{":
+                        bcnt += 1
+                    elif nums[i] == "}":
+                        bcnt -= 1
+                    i += 1
+                if i == len(nums):
+                    pmsg(
+                        ERROR, f"Expression missing terminating character '{str}'")
+            else:
+                arg = parsenum(num)
+                # print(f"arg: {arg} | num: {num}") # DEBUG
+
+                # Still waiting for symbol value to be resolved, go for another pass
+                if arg == SYMVALUNK:
+                    needs_another_pass = True
+                    return SYMVALUNK
+
+                args.append(arg)
+
+            i += 1
+
+    except IndexError:
+        pmsg(
+            ERROR, f"Missing value or extra operation on line '{file_contents[line_num-1]}'")
+
+    pmsg(
+        ERROR, f"Unexpected end of expression on line '{file_contents[line_num-1]}'")
 
 # Returns the result of a prefix-notation expression. String must be terminated with "}"
 def parsepostfixnum(str):
@@ -449,6 +536,7 @@ def escapestr(str):
                 .replace("^M", chr(0xD)) \
                 .replace("^[", chr(0x1B)) \
                 .replace("ESC[", chr(0x1B))
+
 
 # Parses a string and returns a list of comma-separated elements
 def parsecsv(str):
