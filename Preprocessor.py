@@ -35,8 +35,8 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
         with open(filename, "r") as file:
 
             for line in file.readlines():
-                line = line.strip()
                 line = line.split(';')[0] # Ignore comments
+                line = line.strip()
 
                 line_num += 1
 
@@ -48,12 +48,12 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 if line.startswith("//"):
                     continue
 
-                # */
+                # */ - MUST be at beginning of line
                 if re.search(f"^\*/", line):
                     in_multi_comment = False
                     continue
 
-                # /*
+                # /* - MUST be at beginning of line
                 if re.search(f"^/\*", line):
                     if not line.endswith("*/"):
                         in_multi_comment = True
@@ -62,6 +62,9 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 # Ignore anything within a multi-line comment
                 if in_multi_comment:
                     continue
+
+                # Remove end-of-line comments
+                line = line.split("//")[0]
 
                 # ENDIF
                 match = re.search(f"^{PREPROC_CHAR}\W*endif", line, flags=re.IGNORECASE)

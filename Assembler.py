@@ -7,7 +7,13 @@ import Msg
 from Msg import *
 
 # Libraries
+import csv
 import re
+
+
+# CLI options
+ignore_info_msg = False # NOT IMPLEMENTED
+ignore_warn_msg = False  # NOT IMPLEMENTED
 
 # Assembler
 re_symbol_table = {}
@@ -126,18 +132,12 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
 
     val = parsenum(operand[mo:])
 
-    # Value contains an unresolved symbol, assume an addressing mode
-    if val == SYMVALUNK:
-        if addr_mode_force == 0:
-            pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing. '{file_contents[line_num-1]}'")
-        needs_another_pass = True
-
     returnbytes = []
 
-    if (val < 0x000100 and val >= 0 and addr_mode_force == 0 and instruction_d != -1) or addr_mode_force == 1:
+    if (val < 0x000100 and val >= 0 and addr_mode_force == 0 and instruction_d != -1) or addr_mode_force == 1 or (val == SYMVALUNK and instruction_a == -1 and instruction_d != -1):
         returnbytes.append(checkreturnaddrmode(instruction_d))
         returnbytes.append(val & 0xff)
-    elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) or addr_mode_force == 2 or (val == SYMVALUNK and instruction_a != -1):
+    elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) or addr_mode_force == 2 or (val == SYMVALUNK and instruction_a != -1): # TODO: Need to tell assembler to force addressing mode on next pass
         returnbytes.append(checkreturnaddrmode(instruction_a))
         returnbytes.append(val & 0xff)
         returnbytes.append((val >> 8) & 0xff)
@@ -148,6 +148,12 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         returnbytes.append((val >> 16) & 0xff)
     else:
         checkreturnaddrmode(-1)  # Error and exit
+
+    # Value contains an unresolved symbol, assume an addressing mode
+    if val == SYMVALUNK:
+        if addr_mode_force == 0 and (val == SYMVALUNK and instruction_a != -1):
+                pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing. '{file_contents[line_num-1]}'")
+        needs_another_pass = True
 
     return returnbytes
 
@@ -222,6 +228,8 @@ def parsenum(str):
                 val = int(str[so+1:], base=8)
             elif str[so] == "{":
                 val = parsepostfixnum(str[so+1:])
+            elif str[so] == "'" or str[so] == "\"":
+                val = ord(str[so+1])
             else:
                 val = getsym(str)
         else:
@@ -243,7 +251,14 @@ def parsepostfixnum(str):
 
     try:
         # Go through elements
-        for num in str.split(" "):
+        #for num in str.split(" ")
+        nums = str.split(" ")
+        i = 0
+        while i < len(nums):
+            num = nums[i]
+            if len(num) == 0:
+                i += 1
+                continue
 
             # Check for end of expression
             if num == "}":
@@ -277,6 +292,19 @@ def parsepostfixnum(str):
                 num1 = args.pop()
                 num2 = args.pop()
                 args.append(num2 << num1)
+            elif num == "{":
+                subxpr = " ".join(nums[i:])
+                arg = parsenum(subxpr)
+                args.append(arg)
+                bcnt = 0
+                while i < len(nums) and not (nums[i] == "}" and bcnt == 1):
+                    if nums[i] == "{":
+                        bcnt += 1
+                    elif nums[i] == "}":
+                        bcnt -= 1
+                    i += 1
+                if i == len(nums):
+                    pmsg(ERROR, f"Expression missing terminating character '{str}'")
             else:
                 arg = parsenum(num)
                 # print(f"arg: {arg} | num: {num}") # DEBUG
@@ -287,11 +315,12 @@ def parsepostfixnum(str):
                     return SYMVALUNK
                 
                 args.append(arg)
+
+            i += 1
             
     except IndexError:
         pmsg(ERROR, f"Missing value or extra operation on line '{file_contents[line_num-1]}'")
 
-    # TODO: IS THIS NEEDED?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
     pmsg(ERROR, f"Unexpected end of expression on line '{file_contents[line_num-1]}'")
 
 
@@ -374,16 +403,22 @@ def parseargs(i, line, sym):
 
     # Relative addressing
     if instruction.rel8 != -1:
-        return [ instruction.rel8, calcrel8(pc+2, parsenum(operand)) ]
+        to_addr = parsenum(operand)
+        if to_addr == SYMVALUNK:
+            to_addr = pc+2
+        return [ instruction.rel8, calcrel8(pc+2, to_addr) ]
 
     # Relative long
     if instruction.rel16 != -1:
-        return [ instruction.rel16, calcrel16(pc+3, parsenum(operand)) ]
+        to_addr = parsenum(operand)
+        if to_addr == SYMVALUNK:
+            to_addr = pc+3
+        return [ instruction.rel16, calcrel16(pc+3, to_addr) ]
 
     # Block move
     match = re.search(",", operand)
     if match:
-        src_bank = parsenum(operand[:match.span()[0]-1])
+        src_bank = parsenum(operand[:match.span()[0]])
         des_bank = parsenum(operand[match.span()[1]:])
         return [instruction.srcdes, des_bank, src_bank ]
         pass
@@ -391,6 +426,45 @@ def parseargs(i, line, sym):
     # Operand must be an address:
     return getopcodebytes(operand, instruction.drct, instruction.absu, instruction.lng)
 
+
+# Escapes a string
+def escapestr(str):
+    return str.replace("\r", "\r") \
+                .replace("\n", "\n") \
+                .replace("\t", "\t") \
+                .replace("^G", chr(7)) \
+                .replace("^H", chr(8)) \
+                .replace("^I", chr(9)) \
+                .replace("^J", chr(0xA)) \
+                .replace("^L", chr(0xC)) \
+                .replace("^M", chr(0xD)) \
+                .replace("^[", chr(0x1B)) \
+                .replace("ESC[", chr(0x1B))
+
+# Parses a string and returns a list of comma-separated elements
+def parsecsv(str):
+
+    i = 0
+    s = 0
+    iq = False
+    vals = []
+
+    while i < len(str):
+        if (str[i] == "," and not iq) or i == len(str)-1:
+            if i == len(str)-1:
+                i += 1
+            if str[s:i].strip() != "":
+                vals.append(escapestr(str[s:i].strip()))
+                s = i + 1
+            
+        elif str[i] == "\"":
+            iq = not iq
+        elif str[i] == "\\" and len(str) > i+1 and str[i+1] == "\"":
+            i += 1
+        i += 1
+
+    return vals  
+        
 
 # Parses a single line
 def parseline(line):
@@ -456,7 +530,7 @@ def parseline(line):
             elif sym.lower() == "byt":
                 
                 # Allow comma-delimited values
-                nums = line[i+1:].split(",")
+                nums = parsecsv(line[i+1:])
 
                 # Go over all values on line
                 for num in nums:

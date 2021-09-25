@@ -81,7 +81,7 @@ INSTRUCTIONS = {
     "JMP" : Instruction("JMP",      "S",    -1,     0x4C,   0x5C,   -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     0x6C,   -1,     -1,     0x7C,   -1,     -1,     -1  ),
     "JSL" : Instruction("JSL",      "S",    -1,     -1,     0x22,   -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1  ),
     "JSR" : Instruction("JSR",      "S",    -1,     0x20,   -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     0xFC,   -1,     -1,     -1  ),
-    "LDA" : Instruction("LDA",      "A",    0xA9,   0xAD,   0xAF,   0xA5,   -1,     0xB1,   0xB7,   0xA1,   0xB5    -1,     0xBD,   0xBF,   0xB9,   -1,     -1,     -1,     0xB2,   0xA7,   -1,     0xA3,   0xB3,   -1  ),
+    "LDA" : Instruction("LDA",      "A",    0xA9,   0xAD,   0xAF,   0xA5,   -1,     0xB1,   0xB7,   0xA1,   0xB5,   -1,     0xBD,   0xBF,   0xB9,   -1,     -1,     -1,     0xB2,   0xA7,   -1,     0xA3,   0xB3,   -1  ),
     "LDX" : Instruction("LDX",      "X",    0xA2,   0xAE,   -1,     0xA6,   -1,     -1,     -1,     -1,     -1,     0xB6,   -1,     -1,     0xBE,   -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1  ),
     "LDY" : Instruction("LDY",      "X",    0xA0,   0xAC,   -1,     0xA4,   -1,     -1,     -1,     -1,     0xB4,   -1,     0xBC,   -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1  ),
     "LSR" : Instruction("LSR",      "A",    -1,     0x4E,   -1,     0x46,   0x4A,   -1,     -1,     -1,     0x56,   -1,     0x5E,   -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1,     -1  ),
