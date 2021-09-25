@@ -6,10 +6,7 @@
 * Add multi-line macro support
 * Add macro-function-like insert syntax ( ex: #define MAC(A) (A*2) )
 * Verify addressing mode parser (parseargs()) is still working after rewrite of instruction table
-* Add CLI args for passing ROM size, input file
 * Add * as current PC syntax
-* Add CLI arg to suppress PASS 1 "unknown symbol" messages
-* Add CLI arg to add base ROM offset as first 2 bytes of bin output (.o64 format)
 * Add CLI arg(s) that allow for auto-uploading of output bin to a remote device via a serial port
 
 ## Code Improvements

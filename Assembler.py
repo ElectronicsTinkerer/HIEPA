@@ -9,6 +9,7 @@ from Msg import *
 # Libraries
 import csv
 import re
+import sys, getopt
 
 
 # CLI options
@@ -62,7 +63,8 @@ def getsym(sym):
         # print(f"Found unresolved symbol: {sym}") # DEBUG
         return un_symbol_table[sym].val
     
-    pmsg(INFO, f"Unknown symbol '{sym}', going for another pass ... '{file_contents[line_num-1]}'")
+    if not (ignore_info_msg and pass_num == 1):
+        pmsg(INFO, f"Unknown symbol '{sym}', going for another pass ... '{file_contents[line_num-1]}'")
     needs_another_pass = True
     return SYMVALUNK
 
@@ -90,15 +92,20 @@ def tryresolvesym(sym):
 
 def writerom8(addr, octet):
     if octet > 0xff or octet < 0:
-        pmsg(WARN, f"Value outside range [0..0xff] on line '{file_contents[line_num-1]}'")
+        if not (ignore_warn_msg and pass_num == 1):
+            pmsg(WARN, f"Value outside range [0..0xff] on line '{file_contents[line_num-1]}'")
     global rom_offset
     global rom_contents
+    global rom_size
+    if addr >= rom_offset + rom_size:
+        pmsg(ERROR, f"Data placed outside of ROM area. Line: '{file_contents[line_num-1]}'")
     rom_contents[addr-rom_offset] = octet
 
 
 def writerom16(addr, word):
     if word > 0xffff or word < 0:
-        pmsg(WARN, f"Value outside range [0..0xffff] on line '{file_contents[line_num-1]}'")
+        if not (ignore_warn_msg and pass_num == 1):
+            pmsg(WARN, f"Value outside range [0..0xffff] on line '{file_contents[line_num-1]}'")
     writerom8(addr, word & 0x00ff)           # Lowbyte
     writerom8(addr+1, (word & 0xff00) >> 8)  # Highbyte
 
@@ -152,6 +159,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
     # Value contains an unresolved symbol, assume an addressing mode
     if val == SYMVALUNK:
         if addr_mode_force == 0 and (val == SYMVALUNK and instruction_a != -1):
+            if not (ignore_warn_msg and pass_num == 1):
                 pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing. '{file_contents[line_num-1]}'")
         needs_another_pass = True
 
@@ -354,7 +362,8 @@ def parseargs(i, line, sym):
         if (instruction.reg == "A" and al) or (instruction.reg == "X" and xl):
             returnbytes.append((val >> 8) & 0xff)
         elif val > 0xff:
-            pmsg(WARN, f"Value is > 0xff with 8 bit reg on line '{file_contents[line_num-1]}'")
+            if not (ignore_warn_msg and pass_num == 1 ):
+                pmsg(WARN, f"Value is > 0xff with 8 bit reg on line '{file_contents[line_num-1]}'")
 
         return returnbytes
             
@@ -619,6 +628,20 @@ def parseline(line):
         i += 1
 
 
+def printhelp():
+    print("               ==== HELP! ====                ")
+    print("")
+    print("Usage: $ Assembler.py [options]")
+    print("")
+    print("  -r, --rom <value>    Set the ROM size")
+    print("  -a, --asm <filename> Set input filename")
+    print("  -o, --out <filename> Set output binary name")
+    print("  --o64                Generate o64 format file")
+    print("  -i, --ignoreinfo     Ignore info messages on pass 1")
+    print("  -w, --ignorewarn     Ignore warnings on pass 1")
+    print("")
+
+
 def printsymtable():
     global re_symbol_table
     
@@ -633,18 +656,57 @@ def printsymtable():
 
 
 if __name__ == "__main__":
+    argv = sys.argv[1:]
 
     print("HIEPA: The Highly InEfficient Python Assembler")
     print("              for the 65816 CPU               ")
     print("            Zach Baldwin Fall 2021            ")
     print("")
 
-    rom_size = parsenum("$8000") # TODO: PARSE CLI ARG for rom size (error if not given)
+    if len(sys.argv) == 1:
+        printhelp()
+        exit(-2)
+
+    format_o64 = False
+    rom_size = parsenum("$8000")
+    out_file = "output.bin"
+    in_file = ""
+
+    try:
+        opts, args = getopt.getopt(argv, "r:a:o:iw", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64"])
+    except getopt.GetoptError:
+        printhelp()
+        exit(-2)
+    for opt, arg in opts:
+        if opt == "--o64":
+            format_o64 = True
+        elif opt in ("-r", "--rom"):
+            rom_size = parsenum(arg)
+        elif opt in ("-o", "--out"):
+            out_file = arg
+        elif opt in ("-i", "--ignoreinfo"):
+            ignore_info_msg = True
+        elif opt in ("-w", "--ignorewarn"):
+            ignore_warn_msg = True
+        elif opt in ("-a", "--asm"):
+            in_file = arg
+        else:
+            pmsg(ERROR, "Unknown option. Run without arguments for help menu.")
+
+    if in_file == "":
+        printhelp()
+        pmsg(ERROR, "I need an input file!")
+
+    if rom_size < 1:
+        printhelp()
+        pmsg(ERROR, "Rom size must be > 0")
+
+    pmsg(INFO, f"ROM SIZE: {rom_size} bytes.")
 
     for i in range(rom_size):
         rom_contents.append(0)
 
-    file_contents = Preprocessor.preprocess("test/boot.asm")  # Stores the lines of source
+    file_contents = Preprocessor.preprocess(in_file)  # Stores the lines of source
     
     while pass_num < 2 or needs_another_pass:
         pass_num += 1
@@ -656,12 +718,7 @@ if __name__ == "__main__":
 
         for line in file_contents:
             line_num += 1
-            # if line.strip() != "": # DEBUG
-            #     print(line) # DEBUG
             parseline(line)
-            # print(f"PC: {pc}")  # DEBUG
-            # print(f"ROM OFFSET: {rom_offset}")  # DEBUG
-            # print(f"ROM SIZE: {rom_size}")  # DEBUG
         
         if pass_num == 1:
             rei = 0
@@ -680,7 +737,9 @@ if __name__ == "__main__":
             pmsg(ERROR, "Allowable passes exhausted, check for recursive or undefined symbols")
 
     # Generate output binary
-    with open("output.bin", "wb") as file:
+    with open(out_file, "wb") as file:
+        if format_o64:
+            file.write(bytearray([rom_offset & 0xff, (rom_offset >> 8) & 0xff]))
         file.write(bytearray(rom_contents))
 
     pmsg(INFO, f"Total Passes: {pass_num}")

@@ -3,6 +3,7 @@ import Msg
 from Msg import *
 
 import re
+import os
 
 # Prepressor directive character
 PREPROC_CHAR = '#'
@@ -106,7 +107,8 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 match = re.search(f"^{PREPROC_CHAR}\W*include", line, flags=re.IGNORECASE)
                 if match:
                     inc_filename = line[match.span()[1]:].strip("\"<> \t")
-                    for inc_line in preprocess(inc_filename, filename, line_num):
+                    head, tail = os.path.split(filename)
+                    for inc_line in preprocess(os.path.join(head, inc_filename), filename, line_num):
                         file_contents.append(inc_line)
                     continue
 
