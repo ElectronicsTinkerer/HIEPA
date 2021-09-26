@@ -267,11 +267,13 @@ def parsenum(str):
             else:
                 val = getsym(str)
         else:
-            val = parseexp(str, False)
+            val = parseexp(str, str[0] == "(")
         
     except ValueError:
         pmsg(ERROR, f"Invalid number format '{str}' on line '{file_contents[line_num-1]}'")
 
+
+    print(f"RET VAL: {(val >> shift) & mask:08x}")
     return (val >> shift) & mask
 
 
@@ -281,9 +283,20 @@ def preformop(op, current_str, accumulator):
     # if i < len(str)-1 and ((character == "<" and str[i] == "<") or (character == ">" and str[i] == ">")):
     if op in [">", "<"]:
         op = 2 * op
+    
+    arg = 0
+
     if current_str == "":
         return accumulator
-    elif op == "+":
+    else:
+        arg = parsenum(current_str)
+
+        # Still waiting for symbol value to be resolved, go for another pass
+        if arg == SYMVALUNK:
+            needs_another_pass = True
+            return SYMVALUNK
+    
+    if op == "+":
         return accumulator + parsenum(current_str)
     elif op == "-":
         return accumulator - parsenum(current_str)
@@ -305,7 +318,8 @@ def preformop(op, current_str, accumulator):
         return accumulator ^ parsenum(current_str)
     elif op == "":
         return parsenum(current_str)
-    raise SyntaxError(f"Unknown operator '{op}'")
+
+    pmsg(ERROR, f"Unknown operator '{op}' on line '{file_contents[line_num-1]}'")
 
 
 # Parses a normal expression. Expression ends on a non symbol, ',', or ')' character
@@ -342,10 +356,9 @@ def parseexp(str, starts_with_paren):
 
         # Check for end of expression
         if i == len(str) - 1:
-            try:
-                accumulator = preformop(next_op, current_str, accumulator)
-            except SyntaxError as e:
-                pmsg(ERROR, f"{e} on line '{file_contents[line_num-1]}'")
+            accumulator = preformop(next_op, current_str, accumulator)
+            if accumulator == SYMVALUNK:
+                return SYMVALUNK
             if character == ")":
                 num_parens -= 1
             if num_parens != 0:
@@ -355,21 +368,18 @@ def parseexp(str, starts_with_paren):
             return accumulator
 
         # Perform operations on numbers
-        if character in MATH_OPS or character in ['<', '>']:
-
-            try:
-                accumulator = preformop(next_op, current_str, accumulator)
-            except SyntaxError as e:
-                pmsg(ERROR, f"{e} on line '{file_contents[line_num-1]}'")
+        if character in MATH_OPS or character in ['<', '>']:    
+            accumulator = preformop(next_op, current_str, accumulator)
+            if accumulator == SYMVALUNK:
+                return SYMVALUNK
             next_op = character
             current_str = ""
 
         elif character == "(" and not (i == 0 and starts_with_paren):
             subxpr = str[i:]
-            try:
-                accumulator = preformop(next_op, subxpr, accumulator)
-            except SyntaxError as e:
-                pmsg(ERROR, f"{e} on line '{file_contents[line_num-1]}'")
+            accumulator = preformop(next_op, subxpr, accumulator)
+            if accumulator == SYMVALUNK:
+                return SYMVALUNK
             current_str = ""
             bcnt = 0
             while i < len(str) and not (str[i] == ")" and bcnt == 1):
@@ -387,10 +397,9 @@ def parseexp(str, starts_with_paren):
             num_parens -= 1
         elif character == "{":
             subxpr = str[i:]
-            try:
-                accumulator = preformop(next_op, subxpr, accumulator)
-            except SyntaxError as e:
-                pmsg(ERROR, f"{e} on line '{file_contents[line_num-1]}'")
+            accumulator = preformop(next_op, subxpr, accumulator)
+            if accumulator == SYMVALUNK:
+                return SYMVALUNK
             current_str = ""
             bcnt = 0
             while i < len(str) and not (str[i] == "}" and bcnt == 1):
@@ -437,6 +446,7 @@ def parsepostfixnum(str):
                 return val
             
             # Perform operations on numbers
+
             if num == "+":
                 args.append(args.pop() + args.pop())
             elif num == "-":
@@ -815,9 +825,9 @@ def printsymtable():
     for sym in sorted_sym_table:
         val = re_symbol_table[sym].val
         if val == SYMVALUNK:
-            print(f"     * {sym.ljust(24)}: ?????????")
+            print(f"     * {sym.ljust(25)}: ?????????")
         else:
-            print(f"     * {sym.ljust(24)}: ${val&0xffffffff:08X}")
+            print(f"     * {sym.ljust(25)}: ${val&0xffffffff:08X}")
 
 
 if __name__ == "__main__":
@@ -910,4 +920,6 @@ if __name__ == "__main__":
     pmsg(INFO, f"Total Passes: {pass_num}")
     
     printsymtable()
+
+    print("=================> DONE! <=================")
 
