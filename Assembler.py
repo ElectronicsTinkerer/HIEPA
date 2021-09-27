@@ -222,12 +222,12 @@ def strcontains(str, ops):
 
 
 # Returns the value of the number contained in str. Whitespace padding is permitted
-def parsenum(str):
+def parsenum(string):
     global re_symbol_table
     global line_num
     # print(f"PARSENUM: '{str}'")
-    str = str.strip()
-    if len(str) < 1:
+    string = string.strip()
+    if len(string) < 1:
         pmsg(ERROR, f"Expected operand on line '{file_contents[line_num-1]}'")
 
     shift = 0
@@ -235,45 +235,47 @@ def parsenum(str):
     so = 0          # Selection Offset
 
     # Check for byte selection operators
-    if str[0] == "<":
+    if string[0] == "<":
         so = 1
         mask = 0xff
-    elif str[0] == ">":
+    elif string[0] == ">":
         so = 1
         shift = 8
         mask = 0xff
-    elif str[0] == "^":
+    elif string[0] == "^":
         so = 1
         shift = 16
         mask = 0xff
 
     val = 0
     try:
-        if str[so].isdigit():
-            val = int(str, base=10)
-        elif len(str) > so and (not strcontains(str, MATH_OPS) or strcontains(str, ["{", "}"])):
-            if str[so] == "$":
-                val = int(str[so+1:], base=16)
-            elif str[so] == "%":
-                val = int(str[so+1:], base=2)
-            elif str[so]== "?":
-                val = int(str[so+1:], base=8)
-            elif str[so] == "{":
-                val = parsepostfixnum(str[so+1:])
-            elif str[so] == "(":
-                val = parseexp(str[so:], True)
-            elif str[so] == "'" or str[so] == "\"":
-                if str[so+1] == "\\":
-                    val = ord(escapestr(str[so+1:])[0])
+        if string[so].isdigit():
+            val = int(string, base=10)
+        elif len(string) > so and (not strcontains(string, MATH_OPS) or strcontains(string, ["{", "}"])):
+            if string[so] == "$":
+                val = int(string[so+1:], base=16)
+            elif string[so] == "%":
+                val = int(string[so+1:], base=2)
+            elif string[so]== "?":
+                val = int(string[so+1:], base=8)
+            elif string[so] == "{":
+                val = parsepostfixnum(string[so+1:])
+            elif string[so] == "(":
+                val = parseexp(string[so:], True)
+            elif string[so] == "'" or string[so] == "\"":
+                print(string[so+1])
+                print(escapestr(string[so+1:]))
+                if string[so+1] == "\\":
+                    val = ord(escapestr(string[so+1:])[0])
                 else:
-                    val = ord(str[so+1])
+                    val = ord(string[so+1])
             else:
-                val = getsym(str)
+                val = getsym(string)
         else:
-            val = parseexp(str, str[0] == "(")
+            val = parseexp(string, string[0] == "(")
         
     except ValueError:
-        pmsg(ERROR, f"Invalid number format '{str}' on line '{file_contents[line_num-1]}'")
+        pmsg(ERROR, f"Invalid number format '{string}' on line '{file_contents[line_num-1]}'")
 
 
     # print(f"RET VAL: {(val >> shift) & mask:08x}")
@@ -614,10 +616,10 @@ def parseargs(i, line, sym):
 
 
 # Escapes a string
-def escapestr(str):
-    return str.replace("\r", "\r") \
-                .replace("\n", "\n") \
-                .replace("\t", "\t") \
+def escapestr(string):
+    return string.replace("\\r", "\r") \
+                .replace("\\n", "\n") \
+                .replace("\\t", "\t") \
                 .replace("^G", chr(7)) \
                 .replace("^H", chr(8)) \
                 .replace("^I", chr(9)) \
