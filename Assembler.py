@@ -225,7 +225,7 @@ def strcontains(str, ops):
 def parsenum(str):
     global re_symbol_table
     global line_num
-    print(f"PARSENUM: '{str}'")
+    # print(f"PARSENUM: '{str}'")
     str = str.strip()
     if len(str) < 1:
         pmsg(ERROR, f"Expected operand on line '{file_contents[line_num-1]}'")
@@ -263,7 +263,10 @@ def parsenum(str):
             elif str[so] == "(":
                 val = parseexp(str[so:], True)
             elif str[so] == "'" or str[so] == "\"":
-                val = ord(str[so+1])
+                if str[so+1] == "\\":
+                    val = ord(escapestr(str[so+1:])[0])
+                else:
+                    val = ord(str[so+1])
             else:
                 val = getsym(str)
         else:
@@ -273,7 +276,7 @@ def parsenum(str):
         pmsg(ERROR, f"Invalid number format '{str}' on line '{file_contents[line_num-1]}'")
 
 
-    print(f"RET VAL: {(val >> shift) & mask:08x}")
+    # print(f"RET VAL: {(val >> shift) & mask:08x}")
     return (val >> shift) & mask
 
 
