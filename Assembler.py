@@ -20,7 +20,9 @@ ignore_warn_msg = False  # NOT IMPLEMENTED
 re_symbol_table = {}
 un_symbol_table = {}
 SYMVALUNK = 0xffffffff
-MATH_OPS = ("+", "-", "*", "/", "<<", ">>", "|", "&", "^")  # "%"
+# MATH_OPS = ("+", "-", "*", "/", "%", "<<", ">>", "|", "&", "^")
+MATH_OPS = ("+", "-", "*", "/")
+MATH_ALT_OPS = ("%", "|", "&", "^")
 
 MAX_PASSES = 7
 
@@ -51,6 +53,7 @@ def addsym(sym, val, exp):
 
 
 def getsym(sym, internal=False):
+    print("SYM: ", sym)
     global needs_another_pass
     global re_symbol_table
     global un_symbol_table
@@ -89,7 +92,7 @@ def tryresolvesym(sym):
         pmsg(ERROR, f"Internal error, unable to find sym '{sym}' in unresolved table during resolution.\nContact someone (probably me or your neighbor) to fix this!")
 
     exp = un_symbol_table[sym].exp
-    val = parsenum(exp)
+    val = parseexp(exp)
 
     if val != SYMVALUNK:
         re_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
@@ -147,7 +150,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         addr_mode_force = 3
 
     print(operand[mo:])
-    val = parsenum(operand[mo:])
+    val = parseexp(operand[mo:])
 
     returnbytes = []
 
@@ -214,10 +217,11 @@ def calcrel16(from_addr, to_addr):
 
 
 # Teturns True if at least one element of ops appears in str
-def strcontains(str, ops):
+def strcontainsop(string, ops):
     for op in ops:
-        if op in str:
-            return True
+         if op in string:
+             if string[string.find(op)+1].strip() == "":
+                return True
     return False
 
 
@@ -225,7 +229,7 @@ def strcontains(str, ops):
 def parsenum(string):
     global re_symbol_table
     global line_num
-    # print(f"PARSENUM: '{str}'")
+    print(f"PARSENUM: '{string}'")
     string = string.strip()
     if len(string) < 1:
         pmsg(ERROR, f"Expected operand on line '{file_contents[line_num-1]}'")
@@ -251,40 +255,41 @@ def parsenum(string):
     try:
         if string[so].isdigit():
             val = int(string, base=10)
-        elif len(string) > so and (not strcontains(string, MATH_OPS) or strcontains(string, ["{", "}"])):
+        elif len(string) > so: # and (not strcontains(string, MATH_OPS) or strcontains(string, ["{", "}"])):
             if string[so] == "$":
                 val = int(string[so+1:], base=16)
             elif string[so] == "%":
                 val = int(string[so+1:], base=2)
-            elif string[so]== "?":
+            elif string[so]== "&":
                 val = int(string[so+1:], base=8)
-            elif string[so] == "{":
-                val = parsepostfixnum(string[so+1:])
-            elif string[so] == "(":
-                val = parseexp(string[so:], True)
+            # elif string[so] == "{":
+            #     val = parsepostfixnum(string[so+1:])
+            # elif string[so] == "(":
+            #     val = parseexp(string[so:], True)
             elif string[so] == "'" or string[so] == "\"":
-                print(string[so+1])
-                print(escapestr(string[so+1:]))
                 if string[so+1] == "\\":
                     val = ord(escapestr(string[so+1:])[0])
                 else:
                     val = ord(string[so+1])
             else:
                 val = getsym(string)
+        # else:
+        #     val = parseexp(string, string[0] == "(")
         else:
-            val = parseexp(string, string[0] == "(")
+            raise ValueError()
         
     except ValueError:
         pmsg(ERROR, f"Invalid number format '{string}' on line '{file_contents[line_num-1]}'")
 
 
-    # print(f"RET VAL: {(val >> shift) & mask:08x}")
+    print(f"RET VAL: {(val >> shift) & mask:08x} | STR: '{string}'")
     return (val >> shift) & mask
 
 
 # Preforms an operation on a string and accumulator, returns the resuls.
 # ONLY for use by the parseexp() function
-def preformop(op, current_str, accumulator):
+def performop(op, current_str, accumulator):
+    print(f"PerformOP: '{current_str}'")
     # if i < len(str)-1 and ((character == "<" and str[i] == "<") or (character == ">" and str[i] == ">")):
     if op in [">", "<"]:
         op = 2 * op
@@ -309,8 +314,8 @@ def preformop(op, current_str, accumulator):
         return accumulator * parsenum(current_str)
     elif op == "/":
         return accumulator / parsenum(current_str)
-    # elif op == "%":
-    #     return accumulator % parsenum(current_str)
+    elif op == "%":
+        return accumulator % parsenum(current_str)
     elif op == ">>":
         return accumulator >> parsenum(current_str)
     elif op == "<<":
@@ -327,41 +332,49 @@ def preformop(op, current_str, accumulator):
     pmsg(ERROR, f"Unknown operator '{op}' on line '{file_contents[line_num-1]}'")
 
 
+# Returns true if a character is an operation in a string
+def containsop(string, op):
+    if op in ("+", "-", "*", "/", "<<", ">>"):
+        return op in string
+    elif op == "%":
+        pass
+
+
 # Parses a normal expression. Expression ends on a non symbol, ',', or ')' character
-def parseexp(str, starts_with_paren):
+def parseexp(string, starts_with_paren=False):
     global needs_another_pass
     global line_num
     global pass_num
 
-    str = str.strip()
+    string = string.strip()
 
-    accumulator = getsym(str, True)
-    if accumulator != SYMVALUNK or issym(str) or not strcontains(str, MATH_OPS):
+    accumulator = getsym(string, True)
+    if (accumulator != SYMVALUNK or issym(string)):
             return accumulator
 
-    str += "\n"
+    string += "\n"
 
     accumulator = 0
     next_op = ""
     current_str = ""
     num_parens = 0
-    op_shift = False
+    # op_shift = False
 
     i = 0
-    while i < len(str):
-        character = str[i]
+    while i < len(string):
+        character = string[i]
         if character != "\n" and character.strip() == "":
             i += 1
             continue
 
-        op_shift = False
-        if i < len(str)-1 and ((character == "<" and str[i] == "<") or (character == ">" and str[i] == ">")):
-            op_shift = True
-            i += 1
+        # op_shift = False
+        # if i < len(string)-1 and ((character == "<" and string[i+1] == "<") or (character == ">" and string[i+1] == ">")):
+        #     op_shift = True
+        #     i += 1
 
         # Check for end of expression
-        if i == len(str) - 1:
-            accumulator = preformop(next_op, current_str, accumulator)
+        if i == len(string) - 1:
+            accumulator = performop(next_op, current_str, accumulator)
             if accumulator == SYMVALUNK:
                 return SYMVALUNK
             if character == ")":
@@ -369,52 +382,59 @@ def parseexp(str, starts_with_paren):
             if num_parens != 0:
                 pmsg(
                     ERROR, f"Unexpected end of expression on line '{file_contents[line_num-1]}'")
-            print(f"STR: '{str}'\n\tFINAL VALUE: ${accumulator&0xffffffff:08X}")
+            print(f"STR: '{string}'\n\tFINAL VALUE: ${accumulator&0xffffffff:08X}")
             return accumulator
 
         # Perform operations on numbers
-        if character in MATH_OPS or character in ['<', '>']:    
-            accumulator = preformop(next_op, current_str, accumulator)
+        if character in MATH_OPS or (character in MATH_ALT_OPS and i < len(string)-1 and string[i+1].strip() == "") \
+            or (character in (">", "<") and i < len(string)-1 and string[i+1] in (">", "<")):
+
+            accumulator = performop(next_op, current_str, accumulator)
             if accumulator == SYMVALUNK:
                 return SYMVALUNK
             next_op = character
             current_str = ""
 
         elif character == "(" and not (i == 0 and starts_with_paren):
-            subxpr = str[i:]
-            accumulator = preformop(next_op, subxpr, accumulator)
-            if accumulator == SYMVALUNK:
-                return SYMVALUNK
+            
             current_str = ""
             bcnt = 0
-            while i < len(str) and not (str[i] == ")" and bcnt == 1):
-                if str[i] == "(":
+            isave = i
+            while i < len(string) and not (string[i] == ")" and bcnt == 1):
+                if string[i] == "(":
                     bcnt += 1
-                elif str[i] == ")":
+                elif string[i] == ")":
                     bcnt -= 1
                 i += 1
-            # num_parens += 1
-            if i == len(str):
-                pmsg(ERROR, f"Expression missing terminating character '{str}'")
+            
+            subxpr = string[isave:i+1]
+            next_val = parseexp(subxpr, True)
+            accumulator = performop(next_op, str(next_val), accumulator)
+
+            if accumulator == SYMVALUNK:
+                return SYMVALUNK
+            if i == len(string):
+                pmsg(ERROR, f"Expression missing terminating character '{string}' on line '{file_contents[line_num-1]}'")
         elif character == "(":
             num_parens += 1
         elif character == ")":
             num_parens -= 1
         elif character == "{":
-            subxpr = str[i:]
-            accumulator = preformop(next_op, subxpr, accumulator)
+            subxpr = string[i+1:]
+            next_val = parsepostfixnum(subxpr)
+            accumulator = performop(next_op, str(next_val), accumulator)
             if accumulator == SYMVALUNK:
                 return SYMVALUNK
             current_str = ""
             bcnt = 0
-            while i < len(str) and not (str[i] == "}" and bcnt == 1):
-                if str[i] == "{":
+            while i < len(string) and not (string[i] == "}" and bcnt == 1):
+                if string[i] == "{":
                     bcnt += 1
-                elif str[i] == "}":
+                elif string[i] == "}":
                     bcnt -= 1
                 i += 1
-            if i == len(str):
-                pmsg(ERROR, f"Expression missing terminating character '{str}'")
+            if i == len(string):
+                pmsg(ERROR, f"Expression missing terminating character '{string}' on line '{file_contents[line_num-1]}'")
         else:
             current_str += character
 
@@ -424,18 +444,19 @@ def parseexp(str, starts_with_paren):
 
 
 # Returns the result of a prefix-notation expression. String must be terminated with "}"
-def parsepostfixnum(str):
+def parsepostfixnum(string):
     global needs_another_pass
     global line_num
 
-    str = str.strip()
+    print("POSTFIX: ", string)
+    string = string.strip()
    
     args = []
 
     try:
         # Go through elements
         #for num in str.split(" ")
-        nums = str.split(" ")
+        nums = string.split(" ")
         i = 0
         while i < len(nums):
             num = nums[i]
@@ -476,21 +497,43 @@ def parsepostfixnum(str):
                 num1 = args.pop()
                 num2 = args.pop()
                 args.append(num2 << num1)
-            elif num == "{":
-                subxpr = " ".join(nums[i:])
-                arg = parsenum(subxpr)
+            elif num == "|":
+                args.append(args.pop() | args.pop())
+            elif num == "&":
+                args.append(args.pop() & args.pop())
+            elif num == "^":
+                args.append(args.pop() ^ args.pop())
+            elif "(" in num:
+                bcnt = 0
+                isave = i
+                while i < len(nums) and not (")" in nums[i] and bcnt == 1):
+                    if "(" in nums[i]:
+                        bcnt += 1
+                    elif ")" in nums[i]:
+                        bcnt -= 1
+                    i += 1
+                subxpr = " ".join(nums[isave:i+1])
+                print("SUBXPE: ", subxpr)
+                arg = parseexp(subxpr, True)
+                args.append(arg)
+
+                if i == len(nums):
+                    pmsg(ERROR, f"Expression missing terminating character '{string}'")
+            elif "{" in num:
+                subxpr = " ".join(nums[i+1:])
+                arg = parsepostfixnum(subxpr)
                 args.append(arg)
                 bcnt = 0
-                while i < len(nums) and not (nums[i] == "}" and bcnt == 1):
-                    if nums[i] == "{":
+                while i < len(nums) and not ("}" in num[i] and bcnt == 1):
+                    if "{" in nums[i]:
                         bcnt += 1
-                    elif nums[i] == "}":
+                    elif "}" in nums[i]:
                         bcnt -= 1
                     i += 1
                 if i == len(nums):
-                    pmsg(ERROR, f"Expression missing terminating character '{str}'")
+                    pmsg(ERROR, f"Expression missing terminating character '{string}'")
             else:
-                arg = parsenum(num)
+                arg = parseexp(num)
                 # print(f"arg: {arg} | num: {num}") # DEBUG
                 
                 # Still waiting for symbol value to be resolved, go for another pass
@@ -530,7 +573,7 @@ def parseargs(i, line, sym):
         if instruction.immd == -1:
             checkreturnaddrmode(-1)  # Error and exti
 
-        val = parsenum(operand[1:])
+        val = parseexp(operand[1:])
 
         returnbytes = [ instruction.immd, val & 0xff ]
 
@@ -591,14 +634,14 @@ def parseargs(i, line, sym):
 
     # Relative addressing
     if instruction.rel8 != -1:
-        to_addr = parsenum(operand)
+        to_addr = parseexp(operand)
         if to_addr == SYMVALUNK:
             to_addr = pc+2
         return [ instruction.rel8, calcrel8(pc+2, to_addr) ]
 
     # Relative long
     if instruction.rel16 != -1:
-        to_addr = parsenum(operand)
+        to_addr = parseexp(operand)
         if to_addr == SYMVALUNK:
             to_addr = pc+3
         return [ instruction.rel16, calcrel16(pc+3, to_addr) ]
@@ -606,8 +649,8 @@ def parseargs(i, line, sym):
     # Block move
     match = re.search(",", operand)
     if match:
-        src_bank = parsenum(operand[:match.span()[0]])
-        des_bank = parsenum(operand[match.span()[1]:])
+        src_bank = parseexp(operand[:match.span()[0]])
+        des_bank = parseexp(operand[match.span()[1]:])
         return [instruction.srcdes, des_bank, src_bank ]
         pass
 
@@ -688,7 +731,7 @@ def parseline(line):
 
             # It is the ORG directive, chnge the PC
             if sym.lower() == "org":
-                tpc = parsenum(line[i+1:])
+                tpc = parseexp(line[i+1:])
                 if pc == -1:    # On first ORG statement, set ROM offset
                     rom_offset = tpc
                 elif tpc > rom_offset + rom_size:
@@ -734,7 +777,7 @@ def parseline(line):
                     
                     # Here's a direct number
                     else:
-                        writerom8(pc, parsenum(num))
+                        writerom8(pc, parseexp(num))
                         pc += 1
 
                 i = len(line)   # Done with line
@@ -743,7 +786,7 @@ def parseline(line):
             elif sym.lower() == "word":
                 
                 # Allow comma-delimited values
-                nums = line[i+1:].split(",")
+                nums = parsecsv(line[i+1:])
 
                 # Go over all values on line
                 for num in nums:
@@ -752,14 +795,14 @@ def parseline(line):
                     # Here's a string literal
                     if num[0] == "\"":
 
-                        # Only works with values [0..127]
-                        for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):
+                        # Only works with values [0..127]?
+                        for s in bytes(num[1:-1], "utf_16").decode("unicode_escape"):
                             writerom16(pc, ord(s))
                             pc += 2
 
                     # Here's a direct number
                     else:
-                        writerom16(pc, parsenum(num))
+                        writerom16(pc, parseexp(num))
                         pc += 2
 
                 i = len(line)   # Done with line
@@ -767,7 +810,7 @@ def parseline(line):
             # Equate
             elif sym.lower() == "equ":
                 exp = line[i:]
-                val = parsenum(exp)
+                val = parseexp(exp)
                 addsym(prev_sym, val, exp)
                 i = len(line)   # Done with line
 
@@ -848,7 +891,7 @@ if __name__ == "__main__":
         exit(-2)
 
     format_o64 = False
-    rom_size = parsenum("$8000")
+    rom_size = parseexp("$8000")
     out_file = "output.bin"
     in_file = ""
 
@@ -861,7 +904,7 @@ if __name__ == "__main__":
         if opt == "--o64":
             format_o64 = True
         elif opt in ("-r", "--rom"):
-            rom_size = parsenum(arg)
+            rom_size = parseexp(arg)
         elif opt in ("-o", "--out"):
             out_file = arg
         elif opt in ("-i", "--ignoreinfo"):
