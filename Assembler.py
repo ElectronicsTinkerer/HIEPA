@@ -53,7 +53,7 @@ def addsym(sym, val, exp):
 
 
 def getsym(sym, internal=False):
-    print("SYM: ", sym)
+    # print("SYM: ", sym)
     global needs_another_pass
     global re_symbol_table
     global un_symbol_table
@@ -149,7 +149,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         mo = 1
         addr_mode_force = 3
 
-    print(operand[mo:])
+    # print(operand[mo:])
     val = parseexp(operand[mo:])
 
     returnbytes = []
@@ -216,20 +216,11 @@ def calcrel16(from_addr, to_addr):
     return offset & 0xFFFF
 
 
-# Teturns True if at least one element of ops appears in str
-def strcontainsop(string, ops):
-    for op in ops:
-         if op in string:
-             if string[string.find(op)+1].strip() == "":
-                return True
-    return False
-
-
 # Returns the value of the number contained in str. Whitespace padding is permitted
 def parsenum(string):
     global re_symbol_table
     global line_num
-    print(f"PARSENUM: '{string}'")
+    # print(f"PARSENUM: '{string}'")
     string = string.strip()
     if len(string) < 1:
         pmsg(ERROR, f"Expected operand on line '{file_contents[line_num-1]}'")
@@ -267,10 +258,12 @@ def parsenum(string):
             # elif string[so] == "(":
             #     val = parseexp(string[so:], True)
             elif string[so] == "'" or string[so] == "\"":
-                if string[so+1] == "\\":
+                if len(string) > so + 3 and string[so+1] == "\\":
                     val = ord(escapestr(string[so+1:])[0])
-                else:
+                elif len(string) > so + 2:
                     val = ord(string[so+1])
+                else:
+                    pmsg(ERROR, f"Expression missing closing character on line '{file_contents[line_num-1]}'")
             else:
                 val = getsym(string)
         # else:
@@ -282,14 +275,14 @@ def parsenum(string):
         pmsg(ERROR, f"Invalid number format '{string}' on line '{file_contents[line_num-1]}'")
 
 
-    print(f"RET VAL: {(val >> shift) & mask:08x} | STR: '{string}'")
+    # print(f"RET VAL: {(val >> shift) & mask:08x} | STR: '{string}'")
     return (val >> shift) & mask
 
 
 # Preforms an operation on a string and accumulator, returns the resuls.
 # ONLY for use by the parseexp() function
 def performop(op, current_str, accumulator):
-    print(f"PerformOP: '{current_str}'")
+    # print(f"PerformOP: '{current_str}'")
     # if i < len(str)-1 and ((character == "<" and str[i] == "<") or (character == ">" and str[i] == ">")):
     if op in [">", "<"]:
         op = 2 * op
@@ -363,7 +356,7 @@ def parseexp(string, starts_with_paren=False):
     i = 0
     while i < len(string):
         character = string[i]
-        if character != "\n" and character.strip() == "":
+        if character != "\n" and character.strip() == "" and not (i > 0 and string[i-1] in ("'", '"')):
             i += 1
             continue
 
@@ -382,7 +375,7 @@ def parseexp(string, starts_with_paren=False):
             if num_parens != 0:
                 pmsg(
                     ERROR, f"Unexpected end of expression on line '{file_contents[line_num-1]}'")
-            print(f"STR: '{string}'\n\tFINAL VALUE: ${accumulator&0xffffffff:08X}")
+            # print(f"STR: '{string}'\n\tFINAL VALUE: ${accumulator&0xffffffff:08X}")
             return accumulator
 
         # Perform operations on numbers
@@ -450,7 +443,7 @@ def parsepostfixnum(string):
     global needs_another_pass
     global line_num
 
-    print("POSTFIX: ", string)
+    # print("POSTFIX: ", string)
     string = string.strip()
    
     args = []
@@ -515,7 +508,7 @@ def parsepostfixnum(string):
                         bcnt -= 1
                     i += 1
                 subxpr = " ".join(nums[isave:i+1])
-                print("SUBXPE: ", subxpr)
+                # print("SUBXPE: ", subxpr)
                 arg = parseexp(subxpr, True)
                 args.append(arg)
 
@@ -534,6 +527,10 @@ def parsepostfixnum(string):
                     i += 1
                 if i == len(nums):
                     pmsg(ERROR, f"Expression missing terminating character '{string}'")
+            elif num in ("'", '"'):
+                arg = ord(' '[0])
+                args.append(arg)
+                i += 1
             else:
                 arg = parseexp(num)
                 # print(f"arg: {arg} | num: {num}") # DEBUG
