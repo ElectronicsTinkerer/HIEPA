@@ -394,6 +394,8 @@ def parseexp(string, starts_with_paren=False):
                 return SYMVALUNK
             next_op = character
             current_str = ""
+            if character in (">", "<"):
+                i += 1
 
         elif character == "(" and not (i == 0 and starts_with_paren):
             
@@ -524,7 +526,7 @@ def parsepostfixnum(string):
                 arg = parsepostfixnum(subxpr)
                 args.append(arg)
                 bcnt = 0
-                while i < len(nums) and not ("}" in num[i] and bcnt == 1):
+                while i < len(nums) and not ("}" in nums[i] and bcnt == 1):
                     if "{" in nums[i]:
                         bcnt += 1
                     elif "}" in nums[i]:
