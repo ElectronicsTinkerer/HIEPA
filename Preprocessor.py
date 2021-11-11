@@ -21,7 +21,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
     global pre_recursion_count
 
     if pre_recursion_count > PREPROC_MAX_RECUSION:
-        pmsg(ERROR, "Max preprocessor recusion limit reached, check for recursive includes.")
+        pmsg(ERROR, f"Max preprocessor recusion limit reached, check for recursive includes. Last file: {filename}, parent file: {parentfilename}")
     pre_recursion_count += 1
 
     file_contents = []
@@ -147,5 +147,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
 
     if len(stack) != 1:
         pmsg(ERROR, f"Unbalanced preprocessor macros in file '{filename}'.")
+
+    pre_recursion_count -= 1
 
     return file_contents
