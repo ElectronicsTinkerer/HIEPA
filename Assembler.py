@@ -861,6 +861,7 @@ def printhelp():
     print("  --o64                Generate o64 format file")
     print("  -i, --ignoreinfo     Ignore info messages on pass 1")
     print("  -w, --ignorewarn     Ignore warnings on pass 1")
+    print("  -l, --listing <filename> Print listing to file")
     print("")
 
 
@@ -893,9 +894,10 @@ if __name__ == "__main__":
     rom_size = parseexp("$8000")
     out_file = "output.bin"
     in_file = ""
+    listing_file = ""
 
     try:
-        opts, args = getopt.getopt(argv, "r:a:o:iw", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64"])
+        opts, args = getopt.getopt(argv, "r:a:o:iwl:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing="])
     except getopt.GetoptError:
         printhelp()
         exit(-2)
@@ -912,6 +914,8 @@ if __name__ == "__main__":
             ignore_warn_msg = True
         elif opt in ("-a", "--asm"):
             in_file = arg
+        elif opt in ("-l", "--listing"):
+            listing_file = arg
         else:
             pmsg(ERROR, "Unknown option. Run without arguments for help menu.")
 
@@ -930,6 +934,13 @@ if __name__ == "__main__":
 
     file_contents = Preprocessor.preprocess(in_file)  # Stores the lines of source
     
+    if listing_file != "":
+        pmsg(INFO, f"Writing listing file {listing_file}")
+        with open(listing_file, "w") as lf:
+            for line in file_contents:
+                lf.write(line)
+                lf.write("\n")
+
     while pass_num < 2 or needs_another_pass:
         pass_num += 1
         line_num = 0
