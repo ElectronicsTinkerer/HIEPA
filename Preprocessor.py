@@ -36,6 +36,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
         with open(filename, "r") as file:
 
             for line in file.readlines():
+                nomod_line = line # Non-modified line (for use in syntax warning/error messages)
                 line = line.split(';')[0] # Ignore comments
                 line = line.strip()
 
@@ -135,7 +136,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 define_keys = reversed(list(pre_defines.keys()))
                 for macro_key in define_keys: 
                     line = line.replace(f"{macro_key}", pre_defines[macro_key])
-                file_contents.append(line)
+                file_contents.append({"pfn": parentfilename, "fn": filename, "line_num": line_num, "line": nomod_line.rstrip(), "ppline": line})
 
 
     except FileNotFoundError:

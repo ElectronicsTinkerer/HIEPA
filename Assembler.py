@@ -1,4 +1,3 @@
-
 # Local imports
 import Instructions
 import Preprocessor
@@ -10,7 +9,7 @@ from Msg import *
 import csv
 import re
 import sys, getopt
-
+from colorama import Fore
 
 # CLI options
 ignore_info_msg = False # NOT IMPLEMENTED
@@ -66,10 +65,10 @@ def getsym(sym, internal=False):
     elif sym in un_symbol_table:
         # print(f"Found unresolved symbol: {sym}") # DEBUG
         return un_symbol_table[sym].val
-    
+
     if not internal:
         if not (ignore_info_msg and pass_num == 1):
-            pmsg(INFO, f"Unknown symbol '{sym}', going for another pass ... '{file_contents[line_num-1]}'")
+            pmsg(INFO,f"Unknown symbol '{sym}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}\n Going for another pass ...\n")
         needs_another_pass = True
     return SYMVALUNK
 
@@ -105,19 +104,19 @@ def tryresolvesym(sym):
 def writerom8(addr, octet):
     if octet > 0xff or octet < 0:
         if not (ignore_warn_msg and pass_num == 1):
-            pmsg(WARN, f"Value outside range [0..0xff] on line '{file_contents[line_num-1]}'")
+            pmsg(WARN, f"Value outside range [0..0xff] on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}\n")
     global rom_offset
     global rom_contents
     global rom_size
     if addr >= rom_offset + rom_size:
-        pmsg(ERROR, f"Data placed outside of ROM area. Line: '{file_contents[line_num-1]}'")
+        pmsg(ERROR, f"Data placed outside of ROM area on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
     rom_contents[addr-rom_offset] = octet
 
 
 def writerom16(addr, word):
     if word > 0xffff or word < 0:
         if not (ignore_warn_msg and pass_num == 1):
-            pmsg(WARN, f"Value outside range [0..0xffff] on line '{file_contents[line_num-1]}'")
+            pmsg(WARN, f"Value outside range [0..0xffff] on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}\n")
     writerom8(addr, word & 0x00ff)           # Lowbyte
     writerom8(addr+1, (word & 0xff00) >> 8)  # Highbyte
 
@@ -128,7 +127,7 @@ def checkreturnaddrmode(instruction_mode):
     global line_num
     # print(f"IS {(instruction_mode):04X}") # DEBUG
     if (instruction_mode < 0):
-        pmsg(ERROR, f"Invalid addressing mode on line '{file_contents[line_num-1]}'")
+        pmsg(ERROR, f"Invalid addressing mode on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
     return instruction_mode
 
 
@@ -179,7 +178,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
     if val == SYMVALUNK:
         if addr_mode_force == 0 and (val == SYMVALUNK and instruction_a != -1):
             if not (ignore_warn_msg and pass_num == 1):
-                pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing. '{file_contents[line_num-1]}'")
+                pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}\n")
         needs_another_pass = True
 
     return returnbytes
@@ -192,10 +191,10 @@ def calcrel8(from_addr, to_addr):
 
     if from_addr < to_addr:
         if offset > 0x7F:
-            pmsg(ERROR, f"Branch out of range ({offset:02X} > +0x7F) on line '{file_contents[line_num-1]}'")
+            pmsg(ERROR, f"Branch out of range ({offset:02X} > +0x7F) on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
     else:
         if offset < -0x80:
-            pmsg(ERROR, f" Branch out of range ({offset:02X} < -0x80) on line '{file_contents[line_num-1]}'")
+            pmsg(ERROR, f" Branch out of range ({offset:02X} < -0x80) on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
     return offset & 0xFF
 
 
@@ -208,11 +207,11 @@ def calcrel16(from_addr, to_addr):
     if from_addr < to_addr:
         if offset > 0x7FFF:
             pmsg(ERROR,
-                 f"Branch out of range ({offset:04X} > +0x7FFF) on line '{file_contents[line_num-1]}'")
+                 f"Branch out of range ({offset:04X} > +0x7FFF) on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
     else:
         if offset < -0x8000:
             pmsg(ERROR,
-                 f"Branch out of range ({offset:04X} < -0x8000) on line '{file_contents[line_num-1]}'")
+                 f"Branch out of range ({offset:04X} < -0x8000) on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
     return offset & 0xFFFF
 
 
@@ -223,7 +222,7 @@ def parsenum(string):
     # print(f"PARSENUM: '{string}'")
     string = string.strip()
     if len(string) < 1:
-        pmsg(ERROR, f"Expected operand on line '{file_contents[line_num-1]}'")
+        pmsg(ERROR, f"Expected operand on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
 
     shift = 0
     mask = 0xffffffff
@@ -263,16 +262,16 @@ def parsenum(string):
                 elif len(string) > so + 2:
                     val = ord(string[so+1])
                 else:
-                    pmsg(ERROR, f"Expression missing closing character on line '{file_contents[line_num-1]}'")
+                    pmsg(ERROR, f"Expression missing closing character on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
             else:
                 val = getsym(string)
         # else:
         #     val = parseexp(string, string[0] == "(")
         else:
             raise ValueError()
-        
+
     except ValueError:
-        pmsg(ERROR, f"Invalid number format '{string}' on line '{file_contents[line_num-1]}'")
+        pmsg(ERROR, f"Invalid number format '{string}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
 
 
     # print(f"RET VAL: {(val >> shift) & mask:08x} | STR: '{string}'")
@@ -286,7 +285,7 @@ def performop(op, current_str, accumulator):
     # if i < len(str)-1 and ((character == "<" and str[i] == "<") or (character == ">" and str[i] == ">")):
     if op in [">", "<"]:
         op = 2 * op
-    
+
     arg = 0
 
     if current_str == "":
@@ -298,7 +297,7 @@ def performop(op, current_str, accumulator):
         if arg == SYMVALUNK:
             needs_another_pass = True
             return SYMVALUNK
-    
+
     if op == "+":
         return accumulator + parsenum(current_str)
     elif op == "-":
@@ -322,7 +321,7 @@ def performop(op, current_str, accumulator):
     elif op == "":
         return parsenum(current_str)
 
-    pmsg(ERROR, f"Unknown operator '{op}' on line '{file_contents[line_num-1]}'")
+    pmsg(ERROR, f"Unknown operator '{op}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
 
 
 # Returns true if a character is an operation in a string
@@ -343,7 +342,7 @@ def parseexp(string, starts_with_paren=False):
 
     accumulator = getsym(string, True)
     if (accumulator != SYMVALUNK or issym(string)):
-            return accumulator
+        return accumulator
 
     string += "\n"
 
@@ -374,7 +373,7 @@ def parseexp(string, starts_with_paren=False):
                 num_parens -= 1
             if num_parens != 0:
                 pmsg(
-                    ERROR, f"Unexpected end of expression on line '{file_contents[line_num-1]}'")
+                    ERROR, f"Unexpected end of expression on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
             # print(f"STR: '{string}'\n\tFINAL VALUE: ${accumulator&0xffffffff:08X}")
             return accumulator
 
@@ -391,7 +390,7 @@ def parseexp(string, starts_with_paren=False):
                 i += 1
 
         elif character == "(" and not (i == 0 and starts_with_paren):
-            
+
             current_str = ""
             bcnt = 0
             isave = i
@@ -401,7 +400,7 @@ def parseexp(string, starts_with_paren=False):
                 elif string[i] == ")":
                     bcnt -= 1
                 i += 1
-            
+
             subxpr = string[isave:i+1]
             next_val = parseexp(subxpr, True)
             accumulator = performop(next_op, str(next_val), accumulator)
@@ -409,7 +408,7 @@ def parseexp(string, starts_with_paren=False):
             if accumulator == SYMVALUNK:
                 return SYMVALUNK
             if i == len(string):
-                pmsg(ERROR, f"Expression missing terminating character '{string}' on line '{file_contents[line_num-1]}'")
+                pmsg(ERROR, f"Expression missing terminating character '{string}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
         elif character == "(":
             num_parens += 1
         elif character == ")":
@@ -429,13 +428,13 @@ def parseexp(string, starts_with_paren=False):
                     bcnt -= 1
                 i += 1
             if i == len(string):
-                pmsg(ERROR, f"Expression missing terminating character '{string}' on line '{file_contents[line_num-1]}'")
+                pmsg(ERROR, f"Expression missing terminating character '{string}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
         else:
             current_str += character
 
         i += 1
 
-    pmsg(ERROR, f"Unexpected end of expression on line '{file_contents[line_num-1]}'")
+    pmsg(ERROR, f"Unexpected end of expression on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
 
 
 # Returns the result of a prefix-notation expression. String must be terminated with "}"
@@ -445,7 +444,7 @@ def parsepostfixnum(string):
 
     # print("POSTFIX: ", string)
     string = string.strip()
-   
+
     args = []
 
     try:
@@ -463,9 +462,9 @@ def parsepostfixnum(string):
             if num == "}":
                 val = args.pop()
                 if len(args) != 0:
-                    pmsg(ERROR, f"Extra symbols in expression on line '{file_contents[line_num-1]}'")
+                    pmsg(ERROR, f"Extra symbols in expression on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
                 return val
-            
+
             # Perform operations on numbers
 
             if num == "+":
@@ -513,7 +512,7 @@ def parsepostfixnum(string):
                 args.append(arg)
 
                 if i == len(nums):
-                    pmsg(ERROR, f"Expression missing terminating character '{string}'")
+                    pmsg(ERROR, f"Expression missing terminating character '{string}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
             elif "{" in num:
                 subxpr = " ".join(nums[i+1:])
                 arg = parsepostfixnum(subxpr)
@@ -526,7 +525,7 @@ def parsepostfixnum(string):
                         bcnt -= 1
                     i += 1
                 if i == len(nums):
-                    pmsg(ERROR, f"Expression missing terminating character '{string}'")
+                    pmsg(ERROR, f"Expression missing terminating character '{string}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
             elif num in ("'", '"'):
                 arg = ord(' '[0])
                 args.append(arg)
@@ -534,20 +533,20 @@ def parsepostfixnum(string):
             else:
                 arg = parseexp(num)
                 # print(f"arg: {arg} | num: {num}") # DEBUG
-                
+
                 # Still waiting for symbol value to be resolved, go for another pass
                 if arg == SYMVALUNK:
                     needs_another_pass = True
                     return SYMVALUNK
-                
+
                 args.append(arg)
 
             i += 1
-            
-    except IndexError:
-        pmsg(ERROR, f"Missing value or extra operation on line '{file_contents[line_num-1]}'")
 
-    pmsg(ERROR, f"Unexpected end of expression on line '{file_contents[line_num-1]}'")
+    except IndexError:
+        pmsg(ERROR, f"Missing value or extra operation on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
+
+    pmsg(ERROR, f"Unexpected end of expression on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
 
 
 # Parses arguments to an instruction
@@ -581,10 +580,10 @@ def parseargs(i, line, sym):
             returnbytes.append((val >> 8) & 0xff)
         elif val > 0xff:
             if not (ignore_warn_msg and pass_num == 1 ):
-                pmsg(WARN, f"Value is > 0xff with 8 bit reg on line '{file_contents[line_num-1]}'")
+                pmsg(WARN, f"Value is > 0xff with 8 bit reg on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}\n")
 
         return returnbytes
-            
+
     # Indirect
     if operand[0] == "(":
 
@@ -599,12 +598,12 @@ def parseargs(i, line, sym):
             return getopcodebytes(operand[1:match.span()[0]], instruction.idrcty, -1, -1)
         if re.search("\)$", operand):
             return getopcodebytes(operand[1:-1], instruction.idrct, instruction.iabs, -1)
-        
+
         #checkreturnaddrmode(-1)  # Error and exit
         if not (ignore_warn_msg and pass_num == 1):
-            pmsg(WARN, f"Potentially invalid addressing mode specified: '{file_contents[line_num-1]}'")
-        
-        
+            pmsg(WARN, f"Potentially invalid addressing mode specified on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}\n")
+
+
     # Indirect long
     if operand[0] == "[":
 
@@ -615,12 +614,12 @@ def parseargs(i, line, sym):
             return getopcodebytes(operand[1:-1], instruction.ildrct, -1, -1)
         else:
             checkreturnaddrmode(-1)  # Error and exit
-        
+
     # Y-indexed
     match = re.search(",\W*(y|Y)$", operand)
     if match:
         return getopcodebytes(operand[:match.span()[0]], instruction.drcty, instruction.absy, -1)
-    
+
     # X-indexed
     match = re.search(",\W*(x|X)$", operand)
     if match:
@@ -687,15 +686,15 @@ def parsecsv(str):
             if str[s:i].strip() != "":
                 vals.append(escapestr(str[s:i].strip()))
                 s = i + 1
-            
+
         elif str[i] == "\"":
             iq = not iq
         elif str[i] == "\\" and len(str) > i+1 and str[i+1] == "\"":
             i += 1
         i += 1
 
-    return vals  
-        
+    return vals
+
 
 # Parses a single line
 def parseline(line):
@@ -710,8 +709,8 @@ def parseline(line):
     global xl
 
     line = line.strip()
-    if (line == ""): 
-        return 
+    if (line == ""):
+        return
 
     sym = ""
     prev_sym = ""
@@ -720,7 +719,7 @@ def parseline(line):
     while i <= len(line):
         if i < len(line):
             c = line[i]
-        else: 
+        else:
             c = ""
 
         # print(f"Char: {c}\tSymbol: {sym}")
@@ -734,7 +733,7 @@ def parseline(line):
                 if pc == -1:    # On first ORG statement, set ROM offset
                     rom_offset = tpc
                 elif tpc > rom_offset + rom_size:
-                    pmsg(ERROR, f"ORG directive outside of ROM area on line '{file_contents[line_num-1]}'")
+                    pmsg(ERROR, f"ORG directive outside of ROM area on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
                 pc = tpc        # Update PC location
                 i = len(line)   # Done with line
 
@@ -759,7 +758,7 @@ def parseline(line):
 
             # DataByte directive
             elif sym.lower() == "byt":
-                
+
                 # Allow comma-delimited values
                 nums = parsecsv(line[i+1:])
 
@@ -773,7 +772,7 @@ def parseline(line):
                         for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):    # Only works with values [0..127]
                             writerom8(pc, ord(s))
                             pc += 1
-                    
+
                     # Here's a direct number
                     else:
                         writerom8(pc, parseexp(num))
@@ -783,7 +782,7 @@ def parseline(line):
 
             # DataWord directive
             elif sym.lower() == "word":
-                
+
                 # Allow comma-delimited values
                 nums = parsecsv(line[i+1:])
 
@@ -805,7 +804,7 @@ def parseline(line):
                         pc += 2
 
                 i = len(line)   # Done with line
-        
+
             # Equate
             elif sym.lower() == "equ":
                 exp = line[i:]
@@ -834,7 +833,10 @@ def parseline(line):
             # Unknown
             else:
                 if prev_sym != "":
-                    pmsg(ERROR, f"Unknown symbol '{prev_sym}' on line '{file_contents[line_num-1]}'")
+                    pmsg(
+                        ERROR,
+                        f"Unknown symbol '{prev_sym}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}"
+                    )
                 prev_sym = sym
 
 
@@ -846,7 +848,7 @@ def parseline(line):
         else:
             # print("ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")  # DEBUG
             pass
-        
+
         i += 1
 
 
@@ -867,7 +869,7 @@ def printhelp():
 
 def printsymtable():
     global re_symbol_table
-    
+
     pmsg(INFO, "Symbol table:")
     sorted_sym_table = sorted(re_symbol_table.keys())
     for sym in sorted_sym_table:
@@ -933,13 +935,13 @@ if __name__ == "__main__":
         rom_contents.append(0)
 
     file_contents = Preprocessor.preprocess(in_file)  # Stores the lines of source
-    
+
     if listing_file != "":
         pmsg(INFO, f"Writing listing file {listing_file}")
         with open(listing_file, "w") as lf:
             for line in file_contents:
-                lf.write(line)
-                lf.write("\n")
+                lf.write(line["line"]) # Add to listing the raw lines
+                lf.write('\n')
 
     while pass_num < 2 or needs_another_pass:
         pass_num += 1
@@ -951,8 +953,8 @@ if __name__ == "__main__":
 
         for line in file_contents:
             line_num += 1
-            parseline(line)
-        
+            parseline(line["ppline"]) # Parse the preprocessed line
+
         if pass_num == 1:
             rei = 0
             while rei <= MAX_PASSES and len(un_symbol_table) > 0:
@@ -976,8 +978,7 @@ if __name__ == "__main__":
         file.write(bytearray(rom_contents))
 
     pmsg(INFO, f"Total Passes: {pass_num}")
-    
+
     printsymtable()
 
-    print("=================> DONE! <=================")
-
+    print(Fore.GREEN + "=================> DONE! <=================" + Fore.RESET)
