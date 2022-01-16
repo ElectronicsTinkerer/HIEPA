@@ -42,7 +42,7 @@ def addsym(sym, val, exp):
     global re_symbol_table
     global un_symbol_table
     global pass_num
-    
+
     if pass_num == 1 and ( (sym in un_symbol_table and un_symbol_table[sym].val != val) or (sym in re_symbol_table and re_symbol_table[sym].val != val) ):
         pmsg(ERROR,f"Multiple define symbol '{sym}'", file_contents[line_num-1])
 
@@ -142,15 +142,22 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
 
     mo = 0
     addr_mode_force = 0
+
+    if "addr_mode" in file_contents[line_num - 1]:
+        addr_mode_force = file_contents[line_num - 1]["addr_mode"]
+
     if operand[0] == "<":
         mo = 1
-        addr_mode_force = 1
+        if addr_mode_force == 0:
+            addr_mode_force = 1
     elif operand[0] in ["!"]:#, "|"]: # Not using '|' since it is used for bitwise OR
         mo = 1
-        addr_mode_force = 2
+        if addr_mode_force == 0:
+            addr_mode_force = 2
     elif operand[0] == ">":
         mo = 1
-        addr_mode_force = 3
+        if addr_mode_force == 0:
+            addr_mode_force = 3
 
     # print(f"operand: '{operand[mo:]}'")
     val = parseexp(operand[mo:])
@@ -162,29 +169,38 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
             or (val == SYMVALUNK and instruction_a == -1 and instruction_d != -1):
         returnbytes.append(checkreturnaddrmode(instruction_d))
         returnbytes.append(val & 0xff)
+        file_contents[line_num - 1]["addr_mode"] = 1 # Force addressing mode for next pass
     elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) \
             or addr_mode_force == 2 \
             or (val == SYMVALUNK and instruction_a != -1) \
-            or (instruction_d == -1 and instruction_a != -1 and instruction_l == -1): # TODO: Need to tell assembler to force addressing mode on next pass
+            or (instruction_d == -1 and instruction_a != -1 and instruction_l == -1):
         returnbytes.append(checkreturnaddrmode(instruction_a))
         returnbytes.append(val & 0xff)
         returnbytes.append((val >> 8) & 0xff)
+        file_contents[line_num - 1]["addr_mode"] = 2  # Force addressing mode for next pass
     elif (val <= 0xffffff and val >= 0x010000 and addr_mode_force == 0 and instruction_l != -1) \
             or addr_mode_force == 3:
         returnbytes.append(checkreturnaddrmode(instruction_l))
         returnbytes.append(val & 0xff)
         returnbytes.append((val >> 8) & 0xff)
         returnbytes.append((val >> 16) & 0xff)
+        file_contents[line_num - 1]["addr_mode"] = 3 # Force addressing mode for next pass
     else:
         # print("getopcodebytes - unable to determine addressing mode operand length")
         checkreturnaddrmode(-1)  # Error and exit
 
     # Value contains an unresolved symbol, assume an addressing mode
     if val == SYMVALUNK:
+        needs_another_pass = True
         if addr_mode_force == 0 and (val == SYMVALUNK and instruction_a != -1):
+
+            file_contents[line_num - 1]["addr_mode"] = 2  # Force addressing mode for next pass
+
             if not (ignore_warn_msg and pass_num == 1):
                 pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing", file_contents[line_num-1])
-        needs_another_pass = True
+
+        else:
+            pmsg(ERROR, f"Forward reference or unresolved symbol, unable to determine addresssing mode", file_contents[line_num-1])
 
     return returnbytes
 
