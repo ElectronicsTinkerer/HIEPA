@@ -10,7 +10,6 @@
 * Add CLI arg(s) that allow for auto-uploading of output bin to a remote device via a serial port
 * Duplicate labels do not result in an error
 * Add CLI arg(s) to define macros
-* 'lda #"A"' throws "[ERROR] Expression missing closing character"
 
 ## Code Improvements
 
