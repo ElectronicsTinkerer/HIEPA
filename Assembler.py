@@ -9,11 +9,11 @@ from Msg import *
 import csv
 import re
 import sys, getopt
-from colorama import Fore
+from colorama import Fore, Style
 
 # CLI options
-ignore_info_msg = False # NOT IMPLEMENTED
-ignore_warn_msg = False  # NOT IMPLEMENTED
+ignore_info_msg = False
+ignore_warn_msg = False
 
 # Assembler
 re_symbol_table = {}
@@ -148,7 +148,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         mo = 1
         addr_mode_force = 3
 
-    # print(operand[mo:])
+    # print(f"operand: '{operand[mo:]}'")
     val = parseexp(operand[mo:])
 
     returnbytes = []
@@ -172,6 +172,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         returnbytes.append((val >> 8) & 0xff)
         returnbytes.append((val >> 16) & 0xff)
     else:
+        # print("getopcodebytes - unable to determine addressing mode operand length")
         checkreturnaddrmode(-1)  # Error and exit
 
     # Value contains an unresolved symbol, assume an addressing mode
@@ -340,6 +341,8 @@ def parseexp(string, starts_with_paren=False):
 
     string = string.strip()
 
+    # print(f"parseexp(): '{string}'")
+
     accumulator = getsym(string, True)
     if (accumulator != SYMVALUNK or issym(string)):
         return accumulator
@@ -390,6 +393,10 @@ def parseexp(string, starts_with_paren=False):
                 i += 1
 
         elif character == "(" and not (i == 0 and starts_with_paren):
+
+            # Allow '~' as an escape character to prevent indirect addressing mode assumption due to macro expansion
+            if not (current_str.strip() == "" or current_str == '~'):
+                pmsg(ERROR, f"Unexpected expression '{current_str}' on line {file_contents[line_num-1]['line_num']} of '{file_contents[line_num-1]['fn']}':\n{file_contents[line_num-1]['line']}")
 
             current_str = ""
             bcnt = 0
@@ -857,13 +864,14 @@ def printhelp():
     print("")
     print("Usage: $ Assembler.py [options]")
     print("")
-    print("  -r, --rom <value>    Set the ROM size")
-    print("  -a, --asm <filename> Set input filename")
-    print("  -o, --out <filename> Set output binary name")
-    print("  --o64                Generate o64 format file")
-    print("  -i, --ignoreinfo     Ignore info messages on pass 1")
-    print("  -w, --ignorewarn     Ignore warnings on pass 1")
-    print("  -l, --listing <filename> Print listing to file")
+    print("  -r, --rom <value>        Set the ROM size")
+    print("  -a, --asm <filename>     Set input filename")
+    print("  -o, --out <filename>     Set output binary name")
+    print("  --o64                    Generate o64 format file")
+    print("  -i, --ignoreinfo         Ignore info messages on pass 1")
+    print("  -w, --ignorewarn         Ignore warnings on pass 1")
+    print("  -l, --listing <filename> Save listing to file")
+    print("  --pplisting <filename>   Save listing after preprocessor")
     print("")
 
 
@@ -897,9 +905,10 @@ if __name__ == "__main__":
     out_file = "output.bin"
     in_file = ""
     listing_file = ""
+    pplisting_file = ""
 
     try:
-        opts, args = getopt.getopt(argv, "r:a:o:iwl:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing="])
+        opts, args = getopt.getopt(argv, "r:a:o:iwl:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting="])
     except getopt.GetoptError:
         printhelp()
         exit(-2)
@@ -918,6 +927,8 @@ if __name__ == "__main__":
             in_file = arg
         elif opt in ("-l", "--listing"):
             listing_file = arg
+        elif opt in ("--pplisting"):
+            pplisting_file = arg
         else:
             pmsg(ERROR, "Unknown option. Run without arguments for help menu.")
 
@@ -940,7 +951,14 @@ if __name__ == "__main__":
         pmsg(INFO, f"Writing listing file {listing_file}")
         with open(listing_file, "w") as lf:
             for line in file_contents:
-                lf.write(line["line"]) # Add to listing the raw lines
+                lf.write(line["line"])  # Add to listing the raw lines
+                lf.write('\n')
+
+    if pplisting_file != "":
+        pmsg(INFO, f"Writing preprocessor listing file {pplisting_file}")
+        with open(pplisting_file, "w") as lf:
+            for line in file_contents:
+                lf.write(line["ppline"])  # Add to listing the raw lines
                 lf.write('\n')
 
     while pass_num < 2 or needs_another_pass:
@@ -949,7 +967,7 @@ if __name__ == "__main__":
         needs_another_pass = False
         al = False
         xl = False
-        pmsg(INFO, f"*** Starting pass #{pass_num} ***")
+        pmsg(INFO, f"{Style.BRIGHT}{Fore.MAGENTA}*** Starting pass #{pass_num} ***{Style.RESET_ALL}")
 
         for line in file_contents:
             line_num += 1
