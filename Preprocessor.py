@@ -37,7 +37,16 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
 
             for line in file.readlines():
                 nomod_line = line # Non-modified line (for use in syntax warning/error messages)
-                line = line.split(';')[0] # Ignore comments
+                
+                chr_index = 0
+                in_quote = False
+                while chr_index < len(line) and (in_quote or line[chr_index] != ';'):
+                    if line[chr_index] == "\"" or line[chr_index] == "'":
+                        in_quote = not in_quote
+                    chr_index += 1
+                line = line[:chr_index] # Ignore comments
+                # line = line.split(';')[0] # Ignore comments
+
                 line = line.strip()
 
                 line_num += 1

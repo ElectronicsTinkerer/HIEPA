@@ -72,7 +72,7 @@ def getsym(sym, internal=False):
 
     if not internal:
         if not (ignore_info_msg and pass_num == 1):
-            pmsg(INFO,f"Unknown symbol '{sym}'", file_contents[line_num-1])
+            pmsg(INFO,f"Unknown symbol '{sym}'", file_contents[line_num-1], APASS)
         needs_another_pass = True
     return SYMVALUNK
 
@@ -197,7 +197,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
             file_contents[line_num - 1]["addr_mode"] = 2  # Force addressing mode for next pass
 
             if not (ignore_warn_msg and pass_num == 1):
-                pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing", file_contents[line_num-1])
+                pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing", file_contents[line_num-1], APASS)
 
         else:
             pmsg(ERROR, f"Forward reference or unresolved symbol, unable to determine addresssing mode", file_contents[line_num-1])
@@ -212,10 +212,10 @@ def calcrel8(from_addr, to_addr):
 
     if from_addr < to_addr:
         if offset > 0x7F:
-            pmsg(ERROR, f"Branch out of range ({offset:02X} > +0x7F)", file_contents[line_num-1])
+            pmsg(ERROR, f"Branch out of range (0x{offset:02X} > +0x7F)", file_contents[line_num-1])
     else:
         if offset < -0x80:
-            pmsg(ERROR, f" Branch out of range ({offset:02X} < -0x80)", file_contents[line_num-1])
+            pmsg(ERROR, f" Branch out of range (0x{offset:02X} < -0x80)", file_contents[line_num-1])
     return offset & 0xFF
 
 
@@ -228,11 +228,11 @@ def calcrel16(from_addr, to_addr):
     if from_addr < to_addr:
         if offset > 0x7FFF:
             pmsg(ERROR,
-                 f"Branch out of range ({offset:04X} > +0x7FFF)", file_contents[line_num-1])
+                 f"Branch out of range (0x{offset:04X} > +0x7FFF)", file_contents[line_num-1])
     else:
         if offset < -0x8000:
             pmsg(ERROR,
-                 f"Branch out of range ({offset:04X} < -0x8000)", file_contents[line_num-1])
+                 f"Branch out of range (0x{offset:04X} < -0x8000)", file_contents[line_num-1])
     return offset & 0xFFFF
 
 
@@ -590,13 +590,17 @@ def parseargs(i, line, sym):
 
     # Implied
     if len(operand) == 0:
+
+        if instruction.impd == -1:
+            checkreturnaddrmode(-1)  # Error and exit
+
         return [ instruction.impd ]
 
     # Immediate addressing
     if operand[0] == "#":
 
         if instruction.immd == -1:
-            checkreturnaddrmode(-1)  # Error and exti
+            checkreturnaddrmode(-1)  # Error and exit
 
         val = parseexp(operand[1:])
 
@@ -677,7 +681,6 @@ def parseargs(i, line, sym):
         src_bank = parseexp(operand[:match.span()[0]])
         des_bank = parseexp(operand[match.span()[1]:])
         return [instruction.srcdes, des_bank, src_bank ]
-        pass
 
     # Operand must be an address:
     return getopcodebytes(operand, instruction.drct, instruction.absu, instruction.lng)
@@ -695,7 +698,8 @@ def escapestr(string):
                 .replace("^L", chr(0xC)) \
                 .replace("^M", chr(0xD)) \
                 .replace("^[", chr(0x1B)) \
-                .replace("ESC[", chr(0x1B))
+                .replace("ESC[", chr(0x1B)) \
+                .replace("\\x1b", chr(0x1B))
 
 
 # Parses a string and returns a list of comma-separated elements

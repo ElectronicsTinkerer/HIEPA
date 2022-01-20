@@ -8,10 +8,10 @@
 * Verify addressing mode parser (parseargs()) is still working after rewrite of instruction table
 * Add * as current PC syntax
 * Add CLI arg(s) that allow for auto-uploading of output bin to a remote device via a serial port
-* Duplicate labels do not result in an error
 * Add CLI arg(s) to define macros
+* Add output bytes to the listing files
+* Better preprocessor removal of comments (Currently, "First half \";\" second half" will have the second half removed)
 
 ## Code Improvements
 
 * If a symbol is unresolved when put into a .word directive, assembler prints warning that it is > 0xffff (when it should not)
-* If a line is 'jsr', the assembler throws an exception and tries to assemble it as a br8 addr mode

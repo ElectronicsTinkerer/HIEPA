@@ -43,6 +43,9 @@ class Instruction:
     def __containes__(self, key):
         return key == self.mne
 
+    def __str__(self):
+        return self.mne
+
 INSTRUCTIONS = {
     #                   MNE         REG     #       a       al      d       A/imp   (d),y   [d],y   (d,x)   d,x     d,y     a,x     al,x    a,y     r       rl      (a)     (d)     [d]     (a,x)   d,s     (d,s),y xyz
     "ADC" : Instruction("ADC",      "A",    0x69,   0x6D,   0x6F,   0x65,   -1,     0x71,   0x77,   0x61,   0x75,   -1,     0x7D,   0x7F,   0x79,   -1,     -1,     -1,     0x72,   0x67,   -1,     0x63,   0x73,   -1  ),
