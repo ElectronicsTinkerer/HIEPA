@@ -11,7 +11,10 @@
 * Add CLI arg(s) to define macros
 * Add output bytes to the listing files
 * Better preprocessor removal of comments (Currently, "First half \";\" second half" will have the second half removed)
+* Add ENUM support (i.e. for zp locations)
+* Add CLI arg to export the symbol table as an includable format
 
 ## Code Improvements
 
 * If a symbol is unresolved when put into a .word directive, assembler prints warning that it is > 0xffff (when it should not)
+* Cannot load immedate (EX: lda #'-') with a character that is a math operator
