@@ -1,4 +1,5 @@
 
+from FileLine import FileLine
 import Msg
 from Msg import *
 
@@ -145,7 +146,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 define_keys = reversed(list(pre_defines.keys()))
                 for macro_key in define_keys: 
                     line = line.replace(f"{macro_key}", pre_defines[macro_key])
-                file_contents.append({"pfn": parentfilename, "fn": filename, "line_num": line_num, "line": nomod_line.rstrip(), "ppline": line})
+                file_contents.append(FileLine(parentfilename=parentfilename, filename=filename, line_num=line_num, line=nomod_line.rstrip(), ppline=line))
 
 
     except FileNotFoundError:

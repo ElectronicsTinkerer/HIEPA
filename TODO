@@ -5,11 +5,9 @@
 * Add support for byte selection operators on 16 bit values
 * Add multi-line macro support
 * Add macro-function-like insert syntax ( ex: #define MAC(A) (A*2) )
-* Verify addressing mode parser (parseargs()) is still working after rewrite of instruction table
 * Add * as current PC syntax
 * Add CLI arg(s) that allow for auto-uploading of output bin to a remote device via a serial port
 * Add CLI arg(s) to define macros
-* Add output bytes to the listing files
 * Better preprocessor removal of comments (Currently, "First half \";\" second half" will have the second half removed)
 * Add ENUM support (i.e. for zp locations)
 * Add CLI arg to export the symbol table as an includable format

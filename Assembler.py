@@ -2,6 +2,7 @@
 import Instructions
 import Preprocessor
 import Symbols
+from FileLine import FileLine
 import Msg
 from Msg import *
 
@@ -33,6 +34,7 @@ rom_offset = 0
 rom_contents = []
 pass_num = 0
 needs_another_pass = False
+LIST_LINE_BREAK = 29            # Width of line before a new line is printed to breakup bytes in a listing file
 
 # For reg widths
 al = False
@@ -143,8 +145,8 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
     mo = 0
     addr_mode_force = 0
 
-    if "addr_mode" in file_contents[line_num - 1]:
-        addr_mode_force = file_contents[line_num - 1]["addr_mode"]
+    if file_contents[line_num - 1].addr_mode != 0:
+        addr_mode_force = file_contents[line_num - 1].addr_mode
 
     if operand[0] == "<":
         mo = 1
@@ -169,7 +171,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
             or (val == SYMVALUNK and instruction_a == -1 and instruction_d != -1):
         returnbytes.append(checkreturnaddrmode(instruction_d))
         returnbytes.append(val & 0xff)
-        file_contents[line_num - 1]["addr_mode"] = 1 # Force addressing mode for next pass
+        file_contents[line_num - 1].addr_mode = 1 # Force addressing mode for next pass
     elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) \
             or addr_mode_force == 2 \
             or (val == SYMVALUNK and instruction_a != -1) \
@@ -177,14 +179,14 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         returnbytes.append(checkreturnaddrmode(instruction_a))
         returnbytes.append(val & 0xff)
         returnbytes.append((val >> 8) & 0xff)
-        file_contents[line_num - 1]["addr_mode"] = 2  # Force addressing mode for next pass
+        file_contents[line_num - 1].addr_mode = 2  # Force addressing mode for next pass
     elif (val <= 0xffffff and val >= 0x010000 and addr_mode_force == 0 and instruction_l != -1) \
             or addr_mode_force == 3:
         returnbytes.append(checkreturnaddrmode(instruction_l))
         returnbytes.append(val & 0xff)
         returnbytes.append((val >> 8) & 0xff)
         returnbytes.append((val >> 16) & 0xff)
-        file_contents[line_num - 1]["addr_mode"] = 3 # Force addressing mode for next pass
+        file_contents[line_num - 1].addr_mode = 3 # Force addressing mode for next pass
     else:
         # print("getopcodebytes - unable to determine addressing mode operand length")
         checkreturnaddrmode(-1)  # Error and exit
@@ -194,7 +196,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         needs_another_pass = True
         if addr_mode_force == 0 and (val == SYMVALUNK and instruction_a != -1):
 
-            file_contents[line_num - 1]["addr_mode"] = 2  # Force addressing mode for next pass
+            file_contents[line_num - 1].addr_mode = 2  # Force addressing mode for next pass
 
             if not (ignore_warn_msg and pass_num == 1):
                 pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing", file_contents[line_num-1], APASS)
@@ -772,8 +774,10 @@ def parseline(line):
             elif sym.upper() in Instructions.INSTRUCTIONS:
 
                 # print("YES, found instruction")  # DEBUG
+                file_contents[line_num-1].rawbytes = []
                 for byte in parseargs(i, line, sym):
                     writerom8(pc, byte)
+                    file_contents[line_num-1].rawbytes.append(byte)
                     pc += 1
 
                 i = len(line)   # Done with line
@@ -801,12 +805,18 @@ def parseline(line):
                     if num[0] == "\"":
 
                         for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):    # Only works with values [0..127]
-                            writerom8(pc, ord(s))
+                            val = ord(s)
+                            writerom8(pc, val)
+                            file_contents[line_num-1].rawbytes.append(val)
                             pc += 1
+                            if "Initial" in file_contents[line_num-1].line:
+                                print("VAL", val, file_contents[line_num-1].rawbytes)
 
                     # Here's a direct number
                     else:
-                        writerom8(pc, parseexp(num))
+                        val = parseexp(num)
+                        writerom8(pc, val)
+                        file_contents[line_num-1].rawbytes .append(val)
                         pc += 1
 
                 i = len(line)   # Done with line
@@ -826,12 +836,18 @@ def parseline(line):
 
                         # Only works with values [0..127]?
                         for s in bytes(num[1:-1], "utf_16").decode("unicode_escape"):
-                            writerom16(pc, ord(s))
+                            val = ord(s)
+                            writerom16(pc, val)
+                            file_contents[line_num-1].rawbytes.append(val & 0xff)
+                            file_contents[line_num-1].rawbytes.append((val >> 8) & 0xff)
                             pc += 2
 
                     # Here's a direct number
                     else:
-                        writerom16(pc, parseexp(num))
+                        val = parseexp(num)
+                        writerom16(pc, val)
+                        file_contents[line_num-1].rawbytes.append(val & 0xff)
+                        file_contents[line_num-1].rawbytes.append((val >> 8) & 0xff)
                         pc += 2
 
                 i = len(line)   # Done with line
@@ -968,18 +984,11 @@ if __name__ == "__main__":
 
     file_contents = Preprocessor.preprocess(in_file)  # Stores the lines of source
 
-    if listing_file != "":
-        pmsg(INFO, f"Writing listing file {listing_file}")
-        with open(listing_file, "w") as lf:
-            for line in file_contents:
-                lf.write(line["line"])  # Add to listing the raw lines
-                lf.write('\n')
-
     if pplisting_file != "":
         pmsg(INFO, f"Writing preprocessor listing file {pplisting_file}")
         with open(pplisting_file, "w") as lf:
             for line in file_contents:
-                lf.write(line["ppline"])  # Add to listing the raw lines
+                lf.write(line.ppline)  # Add to listing the raw lines
                 lf.write('\n')
 
     while pass_num < 2 or needs_another_pass:
@@ -992,7 +1001,9 @@ if __name__ == "__main__":
 
         for line in file_contents:
             line_num += 1
-            parseline(line["ppline"]) # Parse the preprocessed line
+            file_contents[line_num-1].pc = pc
+            file_contents[line_num-1].rawbytes = []
+            parseline(line.ppline) # Parse the preprocessed line
 
         if pass_num == 1:
             rei = 0
@@ -1015,6 +1026,34 @@ if __name__ == "__main__":
         if format_o64:
             file.write(bytearray([rom_offset & 0xff, (rom_offset >> 8) & 0xff]))
         file.write(bytearray(rom_contents))
+
+    
+    if listing_file != "":
+        pmsg(INFO, f"Writing listing file {listing_file}")
+        with open(listing_file, "w") as lf:
+            for line in file_contents:
+                if "Initial" in line.line:
+                    print(line.line, line.rawbytes)
+                printed_line = False
+                line_width = 7
+                lf.write(f"{line.pc:06X}:")     # Print the address
+                for byt in line.rawbytes:       # Print the bytes
+                    lf.write(f" {byt:02X}")
+                    line_width += 3
+                    if line_width >= LIST_LINE_BREAK - 3:
+                        if not printed_line:
+                            lf.write(' '*(LIST_LINE_BREAK-line_width))
+                            lf.write(line.line)  # Add to listing the raw lines
+                            printed_line = True
+                        lf.write('\n       ')
+                        line_width = 7
+
+                if not printed_line:
+                    lf.write(' '*(LIST_LINE_BREAK-line_width))
+                    lf.write(line.line)  # Add to listing the raw lines
+                        
+                lf.write('\n')
+
 
     pmsg(INFO, f"Total Passes: {pass_num}")
 
