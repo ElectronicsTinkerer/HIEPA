@@ -809,8 +809,6 @@ def parseline(line):
                             writerom8(pc, val)
                             file_contents[line_num-1].rawbytes.append(val)
                             pc += 1
-                            if "Initial" in file_contents[line_num-1].line:
-                                print("VAL", val, file_contents[line_num-1].rawbytes)
 
                     # Here's a direct number
                     else:
@@ -1032,8 +1030,6 @@ if __name__ == "__main__":
         pmsg(INFO, f"Writing listing file {listing_file}")
         with open(listing_file, "w") as lf:
             for line in file_contents:
-                if "Initial" in line.line:
-                    print(line.line, line.rawbytes)
                 printed_line = False
                 line_width = 7
                 lf.write(f"{line.pc:06X}:")     # Print the address

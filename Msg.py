@@ -17,7 +17,7 @@ def pmsg(level, msg, line=None, apass=False):
         print(f"{Fore.RED}[ERROR]{Fore.RESET} {msg}", end="")
 
     if line:
-        print(f" on line {line['line_num']} of '{line['fn']}':\n{line['line']}")
+        print(f" on line {line.line_num} of '{line.filename}':\n{line.line}")
         if apass:
             print(" Going for another pass ...")
 
