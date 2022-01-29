@@ -907,6 +907,7 @@ def printhelp():
     print("  -w, --ignorewarn         Ignore warnings on pass 1")
     print("  -l, --listing <filename> Save listing to file")
     print("  --pplisting <filename>   Save listing after preprocessor")
+    print("  -s, --sym <filename>     Save an includable symbol table")
     print("")
 
 
@@ -941,9 +942,10 @@ if __name__ == "__main__":
     in_file = ""
     listing_file = ""
     pplisting_file = ""
+    sym_file = ""
 
     try:
-        opts, args = getopt.getopt(argv, "r:a:o:iwl:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting="])
+        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym="])
     except getopt.GetoptError:
         printhelp()
         exit(-2)
@@ -964,6 +966,8 @@ if __name__ == "__main__":
             listing_file = arg
         elif opt in ("--pplisting"):
             pplisting_file = arg
+        elif opt in ("-s", "--sym"):
+            sym_file = arg
         else:
             pmsg(ERROR, "Unknown option. Run without arguments for help menu.")
 
@@ -1049,6 +1053,16 @@ if __name__ == "__main__":
                     lf.write(line.line)  # Add to listing the raw lines
                         
                 lf.write('\n')
+
+
+    if sym_file != "":
+        sorted_sym_table = sorted(re_symbol_table.keys())
+        pmsg(INFO, f"Writing symbol file {sym_file}")
+        with open(sym_file, "w") as sf:
+            sf.write("; Auto-generated listing file\n")
+            for sym in sorted_sym_table:
+                val = re_symbol_table[sym].val
+                sf.write(f"{sym.ljust(24)} equ ${val&0xffffffff:08X}\n")
 
 
     pmsg(INFO, f"Total Passes: {pass_num}")
