@@ -792,7 +792,7 @@ def parseline(line):
                 # print(f"Found Label: {sym} = ${pc:04X}")  # DEBUG
 
             # DataByte directive
-            elif sym.lower() == "byt":
+            elif sym.lower() in ("byt", "byte"):
 
                 # Allow comma-delimited values
                 nums = parsecsv(line[i+1:])
