@@ -675,7 +675,8 @@ def parseargs(i, line, sym):
         to_addr = parseexp(operand)
         if to_addr == SYMVALUNK:
             to_addr = pc+3
-        return [ instruction.rel16, calcrel16(pc+3, to_addr) ]
+        to_addr = calcrel16(pc+3, to_addr)
+        return [ instruction.rel16, to_addr & 0xff, (to_addr >> 8) & 0xff ]
 
     # Block move
     match = re.search(",", operand)

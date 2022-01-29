@@ -16,3 +16,4 @@
 
 * If a symbol is unresolved when put into a .word directive, assembler prints warning that it is > 0xffff (when it should not)
 * Cannot load immedate (EX: lda #'-') with a character that is a math operator
+* Is symbol is < $100 and instruction does not have a ZP mode, an invalid addressing mode ERROR is thrown (when it should promote the value to abs addressing if available)
