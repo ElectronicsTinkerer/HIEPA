@@ -11,6 +11,7 @@ import csv
 import re
 import sys, getopt
 from colorama import Fore, Style
+from datetime import datetime
 
 # CLI options
 ignore_info_msg = False
@@ -34,6 +35,7 @@ rom_offset = 0
 rom_contents = []
 pass_num = 0
 needs_another_pass = False
+build_num = -1                  # Read from BUILD.NUM file
 LIST_LINE_BREAK = 29            # Width of line before a new line is printed to breakup bytes in a listing file
 
 # For reg widths
@@ -741,6 +743,7 @@ def parseline(line):
     global needs_another_pass
     global al
     global xl
+    global build_num
 
     line = line.strip()
     if (line == ""):
@@ -851,6 +854,22 @@ def parseline(line):
 
                 i = len(line)   # Done with line
 
+            # Date directive
+            elif sym.lower() == "date":
+                for b in bytes(datetime.now().isoformat(timespec='minutes'), "utf_8").decode("unicode_escape"):
+                    val = ord(b)
+                    writerom8(pc, val)
+                    file_contents[line_num-1].rawbytes.append(val & 0xff)
+                    pc += 1
+
+            #BuildNum directive
+            elif sym.lower() == "build":
+                for b in bytes(f"{build_num:06}", "utf_8").decode("unicode_escape"):
+                    val = ord(b)
+                    writerom8(pc, val)
+                    file_contents[line_num-1].rawbytes.append(val & 0xff)
+                    pc += 1
+
             # Equate
             elif sym.lower() == "equ":
                 exp = line[i:]
@@ -909,6 +928,7 @@ def printhelp():
     print("  -l, --listing <filename> Save listing to file")
     print("  --pplisting <filename>   Save listing after preprocessor")
     print("  -s, --sym <filename>     Save an includable symbol table")
+    print("  -b, --build <filename>   Use file for build number storage")
     print("")
 
 
@@ -944,9 +964,10 @@ if __name__ == "__main__":
     listing_file = ""
     pplisting_file = ""
     sym_file = ""
+    build_file = ""
 
     try:
-        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym="])
+        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:b:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym=", "build="])
     except getopt.GetoptError:
         printhelp()
         exit(-2)
@@ -969,6 +990,8 @@ if __name__ == "__main__":
             pplisting_file = arg
         elif opt in ("-s", "--sym"):
             sym_file = arg
+        elif opt in ("-b", "--build"):
+            build_file = arg
         else:
             pmsg(ERROR, "Unknown option. Run without arguments for help menu.")
 
@@ -993,6 +1016,19 @@ if __name__ == "__main__":
             for line in file_contents:
                 lf.write(line.ppline)  # Add to listing the raw lines
                 lf.write('\n')
+
+    # Read build number
+    if build_file != "":
+        try:
+            with open(build_file, "r") as bf:
+                try:
+                    build_num = int(bf.readline()) + 1
+                    pmsg(INFO, f"Build number {build_num}")
+                except:
+                    pmsg(WARN, f"Invalid integer in {build_file} file.")
+        except:
+            build_num = 0
+            pmsg(WARN, f"Unable to open {build_file} for reading.")
 
     while pass_num < 2 or needs_another_pass:
         pass_num += 1
@@ -1066,6 +1102,12 @@ if __name__ == "__main__":
                     val = re_symbol_table[sym].val
                     sf.write(f"{sym.ljust(24)} equ ${val&0xffffffff:08X}\n")
 
+    if build_file != "":
+        try:
+            with open(build_file, "w") as bf:
+                bf.write(str(build_num))
+        except:
+            pmsg(WARN, f"Unable to update {build_file} file.")
 
     pmsg(INFO, f"Total Passes: {pass_num}")
 

@@ -11,8 +11,10 @@ EX: `#define MAC ($12ff + OTHER_MAC) ; comment`
 Rules:
 
 * Comments at end of line are ignored
-* `#define` is case insensitive
+* `#define` is case insensitive (all preprocessor directives are)
 
 Hints:
 
 * To avoid the parentheses around a macro from interfering with addressing mode detection (such as indirect addressing), a `~` may be placed directly before an opening parenthesis. EX: `#define MAC ~($12ff)`
+* `.byt` and `.byte` encode strings at UTF-8 but `.word` encodes data strings as UTF-16.
+
