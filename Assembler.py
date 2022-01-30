@@ -1062,8 +1062,9 @@ if __name__ == "__main__":
         with open(sym_file, "w") as sf:
             sf.write("; Auto-generated listing file\n")
             for sym in sorted_sym_table:
-                val = re_symbol_table[sym].val
-                sf.write(f"{sym.ljust(24)} equ ${val&0xffffffff:08X}\n")
+                if sym[0] != '_': # Ignore any labels starting with '_'
+                    val = re_symbol_table[sym].val
+                    sf.write(f"{sym.ljust(24)} equ ${val&0xffffffff:08X}\n")
 
 
     pmsg(INFO, f"Total Passes: {pass_num}")
