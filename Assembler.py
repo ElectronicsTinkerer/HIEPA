@@ -646,7 +646,7 @@ def parseargs(i, line, sym):
         if match:
             return getopcodebytes(operand[1:match.span()[0]], instruction.ildrcty, -1, -1)
         elif re.search("]$", operand):
-            return getopcodebytes(operand[1:-1], instruction.ildrct, -1, -1)
+            return getopcodebytes(operand[1:-1], instruction.ildrct, instruction.ilabs, -1)
         else:
             checkreturnaddrmode(-1)  # Error and exit
 
