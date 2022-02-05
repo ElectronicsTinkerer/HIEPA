@@ -1066,7 +1066,7 @@ if __name__ == "__main__":
             file.write(bytearray([rom_offset & 0xff, (rom_offset >> 8) & 0xff]))
         file.write(bytearray(rom_contents))
 
-    
+
     if listing_file != "":
         pmsg(INFO, f"Writing listing file {listing_file}")
         with open(listing_file, "w") as lf:
@@ -1088,19 +1088,24 @@ if __name__ == "__main__":
                 if not printed_line:
                     lf.write(' '*(LIST_LINE_BREAK-line_width))
                     lf.write(line.line)  # Add to listing the raw lines
-                        
+
                 lf.write('\n')
 
 
     if sym_file != "":
         sorted_sym_table = sorted(re_symbol_table.keys())
         pmsg(INFO, f"Writing symbol file {sym_file}")
+        inc_name = re.sub("[^a-zA-Z0-9_]", "_", sym_file.upper()) + "_H"
         with open(sym_file, "w") as sf:
             sf.write("; Auto-generated listing file\n")
+            sf.write(f"#ifndef {inc_name}\n")
+            sf.write(f"#define {inc_name}\n")
             for sym in sorted_sym_table:
                 if sym[0] != '_': # Ignore any labels starting with '_'
                     val = re_symbol_table[sym].val
                     sf.write(f"{sym.ljust(24)} equ ${val&0xffffffff:08X}\n")
+
+            sf.write(f"#endif")
 
     if build_file != "":
         try:
