@@ -769,7 +769,7 @@ def parseline(line):
                 tpc = parseexp(line[i+1:])
                 if pc == -1:    # On first ORG statement, set ROM offset
                     rom_offset = tpc
-                elif tpc > rom_offset + rom_size:
+                elif tpc > rom_offset + rom_size or tpc < rom_offset:
                     pmsg(ERROR, f"ORG directive outside of ROM area", file_contents[line_num-1])
                 pc = tpc        # Update PC location
                 i = len(line)   # Done with line

@@ -10,7 +10,7 @@
 * Add CLI arg(s) to define macros
 * Better preprocessor removal of comments (Currently, "First half \";\" second half" will have the second half removed)
 * Add ENUM support (i.e. for zp locations)
-* Add CLI arg to export the symbol table as an includable format
+* Add indicator on CLI symbol output to indicate is a symbol is refrenced
 
 ## Code Improvements
 
