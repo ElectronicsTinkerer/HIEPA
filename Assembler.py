@@ -9,6 +9,7 @@ from Msg import *
 # Libraries
 import csv
 import re
+import os
 import sys, getopt
 from colorama import Fore, Style
 from datetime import datetime
@@ -1099,7 +1100,7 @@ if __name__ == "__main__":
     if sym_file != "":
         sorted_sym_table = sorted(re_symbol_table.keys())
         pmsg(INFO, f"Writing symbol file {sym_file}")
-        inc_name = re.sub("[^a-zA-Z0-9_]", "_", sym_file.upper()) + "_H"
+        inc_name = re.sub("[^a-zA-Z0-9_]", "_", os.path.split(sym_file.upper())[1]) + "_H"
         with open(sym_file, "w") as sf:
             sf.write("; Auto-generated listing file\n")
             sf.write(f"#ifndef {inc_name}\n")

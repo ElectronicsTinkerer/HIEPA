@@ -19,7 +19,7 @@ pre_recursion_count = 0
 def preprocess(filename, base_dir="", parentfilename="", parentlinenum=-1):
     global pre_defines
     global pre_recursion_count
-    print("Parsing "+ filename)
+    
     if pre_recursion_count > PREPROC_MAX_RECURSION:
         pmsg(ERROR, f"Max preprocessor recursion limit reached, check for recursive includes. Last file: {filename}, parent file: {parentfilename}")
     pre_recursion_count += 1
