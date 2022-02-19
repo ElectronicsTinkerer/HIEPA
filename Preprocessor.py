@@ -1,4 +1,3 @@
-
 from FileLine import FileLine
 import Msg
 from Msg import *
@@ -8,7 +7,7 @@ import os
 
 # Prepressor directive character
 PREPROC_CHAR = '#'
-PREPROC_MAX_RECUSION = 7
+PREPROC_MAX_RECURSION = 7
 PREPROC_MAX_NEST = 7
 
 # Preprocessor
@@ -17,12 +16,12 @@ pre_recursion_count = 0
 
 
 # Loads in includes
-def preprocess(filename, parentfilename="", parentlinenum=-1):
+def preprocess(filename, base_dir="", parentfilename="", parentlinenum=-1):
     global pre_defines
     global pre_recursion_count
-
-    if pre_recursion_count > PREPROC_MAX_RECUSION:
-        pmsg(ERROR, f"Max preprocessor recusion limit reached, check for recursive includes. Last file: {filename}, parent file: {parentfilename}")
+    print("Parsing "+ filename)
+    if pre_recursion_count > PREPROC_MAX_RECURSION:
+        pmsg(ERROR, f"Max preprocessor recursion limit reached, check for recursive includes. Last file: {filename}, parent file: {parentfilename}")
     pre_recursion_count += 1
 
     file_contents = []
@@ -34,11 +33,16 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
 
 
     try:
+        chead, ctail = os.path.split(filename)
+        phead, ptail = os.path.split(parentfilename)
+        potential_child = os.path.join(phead, ctail)
+        if os.path.isfile(potential_child): # Prefer local files over remote ones
+            filename = potential_child
         with open(filename, "r") as file:
 
             for line in file.readlines():
                 nomod_line = line # Non-modified line (for use in syntax warning/error messages)
-                
+
                 chr_index = 0
                 in_quote = False
                 while chr_index < len(line) and (in_quote or line[chr_index] != ';'):
@@ -119,7 +123,9 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 if match:
                     inc_filename = line[match.span()[1]:].strip("\"<> \t")
                     head, tail = os.path.split(filename)
-                    for inc_line in preprocess(os.path.join(head, inc_filename), filename, line_num):
+                    if base_dir != "":
+                        head = base_dir
+                    for inc_line in preprocess(os.path.join(head, inc_filename), parentfilename=filename, parentlinenum=line_num):
                         file_contents.append(inc_line)
                     continue
 
@@ -128,7 +134,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 if match:
                     macro = line[match.span()[1]:].split(maxsplit=1)
                     if len(macro) == 0:
-                        pmsg(ERROR, f"#define encountered with no macro specified on line {line_num} of '{filename}")
+                        pmsg(ERROR, f"{PREPROC_CHAR}define encountered with no macro specified on line {line_num} of '{filename}")
 
                     macro_name = macro[0]
                     macro_val = ""
@@ -144,7 +150,7 @@ def preprocess(filename, parentfilename="", parentlinenum=-1):
                 # Nothing special, check for macros, expand them, and append line
                 # REQUIRES python 3.7+ for dict key ordering (order keys were inserted into dict)
                 define_keys = reversed(list(pre_defines.keys()))
-                for macro_key in define_keys: 
+                for macro_key in define_keys:
                     line = line.replace(f"{macro_key}", pre_defines[macro_key])
                 file_contents.append(FileLine(parentfilename=parentfilename, filename=filename, line_num=line_num, line=nomod_line.rstrip(), ppline=line))
 

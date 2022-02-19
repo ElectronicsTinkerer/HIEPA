@@ -764,7 +764,7 @@ def parseline(line):
             sym += c
         elif len(sym) > 0:
 
-            # It is the ORG directive, chnge the PC
+            # It is the ORG directive, change the PC
             if sym.lower() == "org":
                 tpc = parseexp(line[i+1:])
                 if pc == -1:    # On first ORG statement, set ROM offset
@@ -929,6 +929,7 @@ def printhelp():
     print("  --pplisting <filename>   Save listing after preprocessor")
     print("  -s, --sym <filename>     Save an includable symbol table")
     print("  -b, --build <filename>   Use file for build number storage")
+    print("  -d, --base-dir <dir>     Use directory as base during include lookups")
     print("")
 
 
@@ -965,9 +966,10 @@ if __name__ == "__main__":
     pplisting_file = ""
     sym_file = ""
     build_file = ""
+    base_dir = "./" # Default to relative file paths
 
     try:
-        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:b:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym=", "build="])
+        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:b:d:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym=", "build=", "base-dir="])
     except getopt.GetoptError:
         printhelp()
         exit(-2)
@@ -992,6 +994,8 @@ if __name__ == "__main__":
             sym_file = arg
         elif opt in ("-b", "--build"):
             build_file = arg
+        elif opt in ("-d", "--base-dir"):
+            base_dir = arg
         else:
             pmsg(ERROR, "Unknown option. Run without arguments for help menu.")
 
@@ -1008,7 +1012,7 @@ if __name__ == "__main__":
     for i in range(rom_size):
         rom_contents.append(0)
 
-    file_contents = Preprocessor.preprocess(in_file)  # Stores the lines of source
+    file_contents = Preprocessor.preprocess(in_file, base_dir)  # Stores the lines of source
 
     if pplisting_file != "":
         pmsg(INFO, f"Writing preprocessor listing file {pplisting_file}")
