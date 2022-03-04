@@ -1106,9 +1106,10 @@ if __name__ == "__main__":
             sf.write(f"#ifndef {inc_name}\n")
             sf.write(f"#define {inc_name}\n")
             for sym in sorted_sym_table:
-                if sym[0] != '_': # Ignore any labels starting with '_'
-                    val = re_symbol_table[sym].val
-                    sf.write(f"{sym.ljust(24)} equ ${val&0xffffffff:08X}\n")
+                if sym[0] == '_': # Ignore any labels starting with '_'
+                    sf.write("; ")
+                val = re_symbol_table[sym].val
+                sf.write(f"{sym.ljust(24)} equ ${val&0xffffffff:08X}\n")
 
             sf.write(f"#endif")
 
