@@ -11,6 +11,10 @@
 * Better preprocessor removal of comments (Currently, "First half \";\" second half" will have the second half removed)
 * Add ENUM support (i.e. for zp locations)
 * Add indicator on CLI symbol output to indicate is a symbol is refrenced
+* Add syntax to specify the address that a label is placed (e.g. `label: @$700`)
+* Add ability to specify location where `#load`ed functions get placed (and which ones are loaded)
+* Add preprocessor `#load "file.inc" blocks x@$f000, y@myLabel, z@45809` directive which is like a python `from filename import x, y, z`
+* Add `#beginblock <name>`/`#endblock` preprocessor directives for selectively `#load`ing in blocks
 
 ## Code Improvements
 
