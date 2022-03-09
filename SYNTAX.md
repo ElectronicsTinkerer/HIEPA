@@ -18,3 +18,11 @@ Hints:
 * To avoid the parentheses around a macro from interfering with addressing mode detection (such as indirect addressing), a `~` may be placed directly before an opening parenthesis. EX: `#define MAC ~($12ff)`
 * `.byt` and `.byte` encode strings at UTF-8 but `.word` encodes data strings as UTF-16.
 
+**Number Formats**
+
+| Base | Example   |
+| ---- | --------- |
+| 2    | %00110101 |
+| 8    | &065      |
+| 10   | 53        |
+| 16   | $35       |
