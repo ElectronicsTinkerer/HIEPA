@@ -26,3 +26,4 @@
 DeprecationWarning: invalid escape sequence '\>'
   for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):    # Only works with values [0..127]
 ```
+* `lda (dp),x` does not result in an invalid addressing mode message (when it should be invalid)
