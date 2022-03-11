@@ -934,17 +934,19 @@ def printhelp():
     print("")
 
 
-def printsymtable():
-    global re_symbol_table
+def printsymtable(inc_hidden_sym):
 
+    if not inc_hidden_sym:
+        pmsg(INFO, "Hiding private symbols")
     pmsg(INFO, "Symbol table:")
     sorted_sym_table = sorted(re_symbol_table.keys())
     for sym in sorted_sym_table:
-        val = re_symbol_table[sym].val
-        if val == SYMVALUNK:
-            print(f"     * {sym.ljust(25)}: ?????????")
-        else:
-            print(f"     * {sym.ljust(25)}: ${val&0xffffffff:08X}")
+        if inc_hidden_sym or sym[0] != '_':
+            val = re_symbol_table[sym].val
+            if val == SYMVALUNK:
+                print(f"     * {sym.ljust(25)}: ?????????")
+            else:
+                print(f"     * {sym.ljust(25)}: ${val&0xffffffff:08X}")
 
 
 if __name__ == "__main__":
@@ -968,9 +970,10 @@ if __name__ == "__main__":
     sym_file = ""
     build_file = ""
     base_dir = "./" # Default to relative file paths
+    inc_hidden_sym = False
 
     try:
-        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:b:d:", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym=", "build=", "base-dir="])
+        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:b:d:h", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym=", "build=", "base-dir=", "hidden"])
     except getopt.GetoptError:
         printhelp()
         exit(-2)
@@ -997,6 +1000,8 @@ if __name__ == "__main__":
             build_file = arg
         elif opt in ("-d", "--base-dir"):
             base_dir = arg
+        elif opt in ("-h", "--hidden"):
+            inc_hidden_sym = True
         else:
             pmsg(ERROR, "Unknown option. Run without arguments for help menu.")
 
@@ -1106,7 +1111,7 @@ if __name__ == "__main__":
             sf.write(f"#ifndef {inc_name}\n")
             sf.write(f"#define {inc_name}\n")
             for sym in sorted_sym_table:
-                if sym[0] == '_': # Ignore any labels starting with '_'
+                if inc_hidden_sym and sym[0] == '_': # Ignore any labels starting with '_'
                     sf.write("; ")
                 val = re_symbol_table[sym].val
                 sf.write(f"{sym.ljust(24)} equ ${val&0xffffffff:08X}\n")
@@ -1122,6 +1127,6 @@ if __name__ == "__main__":
 
     pmsg(INFO, f"Total Passes: {pass_num}")
 
-    printsymtable()
+    printsymtable(inc_hidden_sym)
 
     print(Fore.GREEN + "=================> DONE! <=================" + Fore.RESET)
