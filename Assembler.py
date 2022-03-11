@@ -931,10 +931,11 @@ def printhelp():
     print("  -s, --sym <filename>     Save an includable symbol table")
     print("  -b, --build <filename>   Use file for build number storage")
     print("  -d, --base-dir <dir>     Use directory as base during include lookups")
+    print("  -h, --hidden             Don't include _labels in listings")
     print("")
 
 
-def printsymtable(inc_hidden_sym):
+def printsymtable(inc_hidden_sym=True):
 
     if not inc_hidden_sym:
         pmsg(INFO, "Hiding private symbols")
@@ -1067,6 +1068,11 @@ if __name__ == "__main__":
                 rei += 1
 
         if pass_num == MAX_PASSES:
+            for sym in un_symbol_table: # Copy all symbols, resolved or not into the resolved table
+                
+                exp = un_symbol_table[sym].exp
+                val = parseexp(exp)
+                re_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
             printsymtable()
             pmsg(ERROR, "Allowable passes exhausted, check for recursive or undefined symbols")
 
