@@ -13,17 +13,17 @@ lbl2:
     .org &7754
 lbl3:
     ldy #0
-;#include "test/myotherfile.asm"
-;#define AM 60
-;# define XYM 90
-;#define  __FOO__ { { AM } { XYM } * }
+; #include "test/myotherfile.asm"
+#define AM 60
+# define XYM 90
+#define  __FOO__ { { AM } { XYM } * }
     .xl
     ldx #{ firstvar 600 + }
     ldx #<$f001 ; This is another comment!
-    sta ($f050),y
+    ; sta ($f050),y ; This line should give an invalid address mode error
     asl !secondlabel
 
-    lda ( $3000, x )
+    ; lda ( $3000, x ) ; Should also give an invalid address mode error
 
     .word { 5 myvar 2 * + myothervar - firstvar + }
     .byt $40
@@ -37,3 +37,5 @@ secondlabel:
     adc [%10110101]
     adc __FOO__
     asl <secondlabel
+    nop
+    bra PC+2

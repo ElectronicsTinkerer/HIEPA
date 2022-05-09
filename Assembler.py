@@ -1,18 +1,19 @@
-# Local imports
-import Instructions
-import Preprocessor
-import Symbols
-from FileLine import FileLine
-import Msg
-from Msg import *
+# Python-based 65816 assembler
+# Zach Baldwin 2021-2022
 
 # Libraries
-import csv
 import re
 import os
 import sys, getopt
 from colorama import Fore, Style
 from datetime import datetime
+
+
+# Local imports
+import Instructions
+import Preprocessor
+import Symbols
+from Msg import *
 
 # CLI options
 ignore_info_msg = False
@@ -43,29 +44,28 @@ LIST_LINE_BREAK = 29            # Width of line before a new line is printed to 
 al = False
 xl = False
 
-def addsym(sym, val, exp):
+def getpcsym(lpc):
+    return Symbols.Symbol("PC", lpc, lpc, lpc)
+
+def addsym(sym, val, exp, lpc):
     global re_symbol_table
     global un_symbol_table
-    global pass_num
 
     if pass_num == 1 and ( (sym in un_symbol_table and un_symbol_table[sym].val != val) or (sym in re_symbol_table and re_symbol_table[sym].val != val) ):
         pmsg(ERROR,f"Multiple define symbol '{sym}'", file_contents[line_num-1])
 
     if val == SYMVALUNK:
-        un_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
+        un_symbol_table[sym] = Symbols.Symbol(sym, val, exp, lpc)
     else:
-        re_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
+        re_symbol_table[sym] = Symbols.Symbol(sym, val, exp, lpc)
 
         if sym in un_symbol_table:
             un_symbol_table.pop(sym)
 
 
 def getsym(sym, internal=False):
-    # print("SYM: ", sym)
+    # print("SYM: ", sym, internal)
     global needs_another_pass
-    global re_symbol_table
-    global un_symbol_table
-    global line_num
 
     if sym in re_symbol_table:
         # print(f"Found resolved symbol: {sym}") # DEBUG
@@ -84,8 +84,6 @@ def getsym(sym, internal=False):
 
 # Returns true if a symbol is in one of the symbol tables
 def issym(sym):
-    global re_symbol_table
-    global un_symbol_table
     return (sym in re_symbol_table) or (sym in un_symbol_table)
 
 # Attempts to resolve a symbol. If successful, symbol is moved to re_symbol_table
@@ -100,10 +98,12 @@ def tryresolvesym(sym):
         pmsg(ERROR, f"Internal error, unable to find sym '{sym}' in unresolved table during resolution.\nContact someone (probably me or your neighbor) to fix this!")
 
     exp = un_symbol_table[sym].exp
+    lpc = un_symbol_table[sym].lpc
+    re_symbol_table["PC"] = getpcsym(lpc)  # Update the PC location
     val = parseexp(exp)
 
     if val != SYMVALUNK:
-        re_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
+        re_symbol_table[sym] = Symbols.Symbol(sym, val, exp, lpc)
         un_symbol_table.pop(sym)
         return 1
 
@@ -204,6 +204,14 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
             if not (ignore_warn_msg and pass_num == 1):
                 pmsg(WARN, f"Forward reference or unresolved symbol, defaulting to absolute addressing", file_contents[line_num-1], APASS)
 
+        elif val == SYMVALUNK and (
+                (instruction_d != -1 and addr_mode_force == 1) or
+                (instruction_a != -1 and addr_mode_force == 2) or
+                (instruction_l != -1 and addr_mode_force == 3)):
+
+            if not (ignore_warn_msg and pass_num == 1):
+                pmsg(INFO, f"Forced addressing mode '{addr_mode_force}'", file_contents[line_num-1])
+
         else:
             pmsg(ERROR, f"Forward reference or unresolved symbol, unable to determine addresssing mode", file_contents[line_num-1])
 
@@ -269,7 +277,7 @@ def parsenum(string):
 
     val = 0
     try:
-        if string[so].isdigit():
+        if string[so].isdigit() or string[so] == '-':
             val = int(string, base=10)
         elif len(string) > so: # and (not strcontains(string, MATH_OPS) or strcontains(string, ["{", "}"])):
             if string[so] == "$":
@@ -304,10 +312,10 @@ def parsenum(string):
     return (val >> shift) & mask
 
 
-# Preforms an operation on a string and accumulator, returns the resuls.
+# Preforms an operation on a string and accumulator, returns the results.
 # ONLY for use by the parseexp() function
 def performop(op, current_str, accumulator):
-    # print(f"PerformOP: '{current_str}'")
+    # print(f"PerformOP: '{op}':'{current_str}'")
     # if i < len(str)-1 and ((character == "<" and str[i] == "<") or (character == ">" and str[i] == ">")):
     if op in [">", "<"]:
         op = 2 * op
@@ -793,7 +801,7 @@ def parseline(line):
 
             # If it's a label, append it to the table
             elif c == ":":
-                addsym(sym, pc, pc)
+                addsym(sym, pc, pc, pc)
                 # print(f"Found Label: {sym} = ${pc:04X}")  # DEBUG
 
             # DataByte directive
@@ -875,7 +883,7 @@ def parseline(line):
             elif sym.lower() == "equ":
                 exp = line[i:]
                 val = parseexp(exp)
-                addsym(prev_sym, val, exp)
+                addsym(prev_sym, val, exp, pc)
                 i = len(line)   # Done with line
 
             # ROM directive, ignored on pass != 1
@@ -974,7 +982,7 @@ if __name__ == "__main__":
     inc_hidden_sym = False
 
     try:
-        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:b:d:h", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym=", "build=", "base-dir=", "hidden"])
+        opts, args = getopt.getopt(argv, "r:a:o:iwl:s:b:d:h", ["rom=", "asm=", "out=", "ignoreinfo", "ignorewarn", "o64", "listing=", "pplisting=", "sym=", "build=", "base-dir=", "hidden", "help"])
     except getopt.GetoptError:
         printhelp()
         exit(-2)
@@ -1003,6 +1011,9 @@ if __name__ == "__main__":
             base_dir = arg
         elif opt in ("-h", "--hidden"):
             inc_hidden_sym = True
+        elif opt in ("--help"):
+            printhelp()
+            exit(0)
         else:
             pmsg(ERROR, "Unknown option. Run without arguments for help menu.")
 
@@ -1053,6 +1064,7 @@ if __name__ == "__main__":
             line_num += 1
             file_contents[line_num-1].pc = pc
             file_contents[line_num-1].rawbytes = []
+            re_symbol_table["PC"] = getpcsym(pc)  # Update the PC location
             parseline(line.ppline) # Parse the preprocessed line
 
         if pass_num == 1:
@@ -1069,10 +1081,11 @@ if __name__ == "__main__":
 
         if pass_num == MAX_PASSES:
             for sym in un_symbol_table: # Copy all symbols, resolved or not into the resolved table
-                
+
                 exp = un_symbol_table[sym].exp
+                lpc = un_symbol_table[sym].lpc
                 val = parseexp(exp)
-                re_symbol_table[sym] = Symbols.Symbol(sym, val, exp)
+                re_symbol_table[sym] = Symbols.Symbol(sym, val, exp, lpc)
             printsymtable()
             pmsg(ERROR, "Allowable passes exhausted, check for recursive or undefined symbols")
 

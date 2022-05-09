@@ -5,7 +5,6 @@
 * Add support for byte selection operators on 16 bit values
 * Add multi-line macro support
 * Add macro-function-like insert syntax ( ex: #define MAC(A) (A*2) )
-* Add * as current PC syntax
 * Add CLI arg(s) that allow for auto-uploading of output bin to a remote device via a serial port
 * Add CLI arg(s) to define macros
 * Better preprocessor removal of comments (Currently, "First half \";\" second half" will have the second half removed)
@@ -27,3 +26,15 @@ DeprecationWarning: invalid escape sequence '\>'
   for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):    # Only works with values [0..127]
 ```
 * `lda (dp),x` does not result in an invalid addressing mode message (when it should be invalid)
+* `cmd #' '` gets assembled to nothing with no warnings or errors thrown
+
+
+# DONE:
+
+## Functional Stuff (Features)
+
+* Add * as current PC syntax
+  -> Now just using "PC" as equivalent
+
+
+## Code Improvements

@@ -1,6 +1,6 @@
 
 ; A comment
-#ifdef FOO ; A thrid comment
+#ifdef FOO ; A third comment
 #undef FOO
 #ifndef FOO
 ; Another comment

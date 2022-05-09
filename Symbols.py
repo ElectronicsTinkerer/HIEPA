@@ -1,9 +1,10 @@
 
 class Symbol:
-    def __init__(self, sym, val, exp):
+    def __init__(self, sym:str, val:int, exp:str, lpc:int):
         self.sym = sym 
         self.val = val
         self.exp = exp
+        self.lpc = lpc
 
     def __eq__(self, other):
         if (type(other) == Symbol):
