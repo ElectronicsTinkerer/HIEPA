@@ -34,7 +34,8 @@ DeprecationWarning: invalid escape sequence '\>'
 ## Functional Stuff (Features)
 
 * Add * as current PC syntax
-  -> Now just using "PC" as equivalent
+  -> Now just using "$" as current PC of instruction
+  -> Internally uses INTERNAL_PC_SYM to keep track of $
 
 
 ## Code Improvements

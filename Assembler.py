@@ -26,7 +26,7 @@ SYMVALUNK = 0xffffffff
 # MATH_OPS = ("+", "-", "*", "/", "%", "<<", ">>", "|", "&", "^")
 MATH_OPS = ("+", "-", "*", "/")
 MATH_ALT_OPS = ("%", "|", "&", "^")
-
+INTERNAL_PC_SYM = "__$PC__"
 MAX_PASSES = 7
 
 pc = -1
@@ -45,7 +45,7 @@ al = False
 xl = False
 
 def getpcsym(lpc):
-    return Symbols.Symbol("PC", lpc, lpc, lpc)
+    return Symbols.Symbol(INTERNAL_PC_SYM, lpc, lpc, lpc)
 
 def addsym(sym, val, exp, lpc):
     global re_symbol_table
@@ -99,7 +99,7 @@ def tryresolvesym(sym):
 
     exp = un_symbol_table[sym].exp
     lpc = un_symbol_table[sym].lpc
-    re_symbol_table["PC"] = getpcsym(lpc)  # Update the PC location
+    re_symbol_table[INTERNAL_PC_SYM] = getpcsym(lpc)  # Update the PC location
     val = parseexp(exp)
 
     if val != SYMVALUNK:
@@ -281,7 +281,10 @@ def parsenum(string):
             val = int(string, base=10)
         elif len(string) > so: # and (not strcontains(string, MATH_OPS) or strcontains(string, ["{", "}"])):
             if string[so] == "$":
-                val = int(string[so+1:], base=16)
+                if string[so:] == "$":
+                    val = getsym(INTERNAL_PC_SYM)
+                else:
+                    val = int(string[so+1:], base=16)
             elif string[so] == "%":
                 val = int(string[so+1:], base=2)
             elif string[so]== "&":
@@ -1064,7 +1067,7 @@ if __name__ == "__main__":
             line_num += 1
             file_contents[line_num-1].pc = pc
             file_contents[line_num-1].rawbytes = []
-            re_symbol_table["PC"] = getpcsym(pc)  # Update the PC location
+            re_symbol_table[INTERNAL_PC_SYM] = getpcsym(pc)  # Update the PC location
             parseline(line.ppline) # Parse the preprocessed line
 
         if pass_num == 1:
@@ -1088,6 +1091,9 @@ if __name__ == "__main__":
                 re_symbol_table[sym] = Symbols.Symbol(sym, val, exp, lpc)
             printsymtable()
             pmsg(ERROR, "Allowable passes exhausted, check for recursive or undefined symbols")
+
+    # Done with assembling operation, remove the "PC" symbol from table
+    # re_symbol_table.pop(INTERNAL_PC_SYM)
 
     # Generate output binary
     with open(out_file, "wb") as file:

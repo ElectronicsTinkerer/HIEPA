@@ -38,4 +38,4 @@ secondlabel:
     adc __FOO__
     asl <secondlabel
     nop
-    bra PC+2
+    bra $
