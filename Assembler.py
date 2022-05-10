@@ -13,6 +13,7 @@ from datetime import datetime
 import Instructions
 import Preprocessor
 import Symbols
+import Macro
 from Msg import *
 
 # CLI options
@@ -763,6 +764,7 @@ def parseline(line):
 
     sym = ""
     prev_sym = ""
+    line_content = False
 
     i = 0
     while i <= len(line):
@@ -775,6 +777,7 @@ def parseline(line):
         if c.isalnum() or c == '_':
             sym += c
         elif len(sym) > 0:
+            line_content = True # The line contains interesting content
 
             # It is the ORG directive, change the PC
             if sym.lower() == "org":
@@ -913,6 +916,7 @@ def parseline(line):
                     pmsg(ERROR,f"Unknown symbol '{prev_sym}'", file_contents[line_num-1])
                 prev_sym = sym
 
+                line_content = False
 
             sym = ""
 
@@ -924,6 +928,9 @@ def parseline(line):
             pass
 
         i += 1
+
+    if not line_content:
+        pmsg(ERROR, f"Unknown symbol '{prev_sym}'", file_contents[line_num - 1])
 
 
 def printhelp():
@@ -1035,6 +1042,8 @@ if __name__ == "__main__":
 
     file_contents = Preprocessor.preprocess(in_file, base_dir)  # Stores the lines of source
 
+    file_contents = Macro.process(file_contents)  # Stores the lines of source
+
     if pplisting_file != "":
         pmsg(INFO, f"Writing preprocessor listing file {pplisting_file}")
         with open(pplisting_file, "w") as lf:
@@ -1065,10 +1074,12 @@ if __name__ == "__main__":
 
         for line in file_contents:
             line_num += 1
+            # Only process lines if they are not ASM macro definitions
             file_contents[line_num-1].pc = pc
             file_contents[line_num-1].rawbytes = []
-            re_symbol_table[INTERNAL_PC_SYM] = getpcsym(pc)  # Update the PC location
-            parseline(line.ppline) # Parse the preprocessed line
+            if not line.ismacdef:
+                re_symbol_table[INTERNAL_PC_SYM] = getpcsym(pc)  # Update the PC location
+                parseline(line.ppline) # Parse the preprocessed line
 
         if pass_num == 1:
             rei = 0

@@ -1,5 +1,4 @@
 from FileLine import FileLine
-import Msg
 from Msg import *
 
 import re

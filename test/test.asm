@@ -5,6 +5,17 @@ firstvar    equ { myvar aprevar myothervar myvar * + - }
 aprevar     equ { myvar 3 + }
 myvar       equ $20     ; This is a comment
 myothervar  .equ $30
+    INDEX_16
+
+!macro INDEX_16 {
+    .xl
+    rep #$20
+}
+!macro INDEX_8 @g {
+    .xs
+    sep #$20
+    per @g
+}
 
 mylabel:
 lbl:
@@ -37,5 +48,6 @@ secondlabel:
     adc [%10110101]
     adc __FOO__
     asl <secondlabel
+    INDEX_8 secondlabel
     nop
     bra $
