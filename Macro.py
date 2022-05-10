@@ -1,5 +1,6 @@
 # Handles the ASM macros and enums
 
+from threading import local
 from FileLine import FileLine
 from Msg import *
 import re
@@ -64,7 +65,6 @@ def process(lines):
 
             # There's args for the enum, then the user specified an enum identifier
             len_bargs = len(bargs)
-            print(bargs, bargs)
             if len_bargs > 1:
                 found_bracket = False
                 for i in range(len_bargs):
@@ -83,7 +83,7 @@ def process(lines):
                     else:
                         if enum_name != None:
                             pmsg(ERROR, f"Unexpected token '{bargs[i]}' in enum definition", line)
-                    
+
                         if bargs[i][0] == '@':
                             pmsg(WARN, "Enum name does not require '@'. Did you mean to use a macro?", line)
                         enum_name = bargs[i]
@@ -100,7 +100,6 @@ def process(lines):
         match = re.search(f"^{ASM_MACRO_CHAR}\W*macro", content, flags=re.IGNORECASE)
         if match:
             macro = content[match.span()[1]:].split(maxsplit=1)
-            print(macro)
             if len(macro) < 2:
                 pmsg(ERROR, "Expected opening bracket for macro", line)
 
@@ -137,6 +136,7 @@ def process(lines):
 
     # Perform macro/enum replacement
     new_lines = []
+    mac_label_num = 0
     for line in lines:
         new_lines.append(line)
 
@@ -174,6 +174,21 @@ def process(lines):
                 for i in range(len(mac.lines)):
                     for j in range(len(mac.args)):
                         temp_lines[i] = re.sub(mac.args[j], args[j], temp_lines[i])
+
+                # Find local labels
+                local_labels = {}
+                for l in temp_lines: # Build up list of defined labels
+                    matches = re.findall('__[a-zA-Z0-9_\.]*\W*:', l)
+                    if matches:
+                        for m in matches:
+                            local_labels[m[:-1]] = f"{m[:-1]}_{mac_label_num}"
+                            mac_label_num += 1
+
+                # Handle naming of local labels
+                for i in range(len(temp_lines)):
+                    for l in local_labels.keys():
+                        temp_lines[i] = re.sub(l, local_labels[l], temp_lines[i])
+
 
                 line.ismacdef = True # Ignore original line in assembler
                 line.line = f";{line.line[1:]}"

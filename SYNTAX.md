@@ -36,6 +36,7 @@ Notes:
 * Macro names must not have spaces
 * Macros cannot contain other macros
 * Macro expansion does support forward referenced macros
+* Macros support local labels. Any labels defined in a macro that start with `__` are considered to be local to the macro's expansion
 
 **Assembler Enums**
 

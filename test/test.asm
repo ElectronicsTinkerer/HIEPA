@@ -11,10 +11,18 @@ myothervar  .equ $30
     .xl
     rep #$20
 }
-!macro INDEX_8 @g {
+!macro INDEX_8 {
     .xs
     sep #$20
-    per @g
+}
+!macro BRANCH_TEST @temp {
+    inc @temp
+    beq __mac_done
+    inx
+__mac_done:
+}
+!macro LD_A @val {
+    lda #@val
 }
 
 !enum _test =(5+6) {
@@ -54,8 +62,12 @@ secondlabel:
     adc [%10110101]
     adc __FOO__
     asl <secondlabel
-    INDEX_8 secondlabel
+    INDEX_8
     nop
     bra $
     xba
     asl _test.l1
+    BRANCH_TEST $00
+    BRANCH_TEST %00
+    BRANCH_TEST $00
+    BRANCH_TEST $ab
