@@ -1,9 +1,9 @@
 
     org $800
 ;#define OO
-firstvar    equ { myvar aprevar myothervar myvar * + - }
-aprevar     equ { myvar 3 + }
-myvar       equ $20     ; This is a comment
+firstvar    .equ { myvar aprevar myothervar myvar * + - }
+aprevar     .equ { myvar 3 + }
+myvar       .equ $20     ; This is a comment
 myothervar  .equ $30
     INDEX_16
 
@@ -15,6 +15,12 @@ myothervar  .equ $30
     .xs
     sep #$20
     per @g
+}
+
+!enum _test =(5+6) {
+    l1
+    l2
+    l3
 }
 
 mylabel:
@@ -37,7 +43,7 @@ lbl3:
     ; lda ( $3000, x ) ; Should also give an invalid address mode error
 
     .word { 5 myvar 2 * + myothervar - firstvar + }
-    .byt $40
+    .byt $ 
     .word $a0f5
     .byt $0f, 50, "Hello!", $00
     
@@ -51,3 +57,5 @@ secondlabel:
     INDEX_8 secondlabel
     nop
     bra $
+    xba
+    asl _test.l1

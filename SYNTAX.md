@@ -25,6 +25,10 @@ Uses a very similar notation to ACME:
 
 ; Macro usage
     MAC_NAME $50 $60
+
+; Which will assemble as
+    lda $50
+    sta $60
 ```
 
 Notes:
@@ -33,6 +37,30 @@ Notes:
 * Macros cannot contain other macros
 * Macro expansion does support forward referenced macros
 
+**Assembler Enums**
+
+Very similar to the assembler macros:
+```
+; Enum definition
+!enum [ENUM_NAME] [=start_val] {
+    UP
+    LEFT
+    DOWN
+    RIGHT
+}
+
+; Enum usage with no name given
+    lda #up
+; If the enum has a name, then the enum's name must also be used
+    lda #ENUM_NAME.UP
+```
+
+Notes:
+* The enum name is optional but if specified, the name must be used to qualify the keys when using them.
+* The base starting value is optional. If provided, it must:
+  * Start with an `=`
+  * Contain no whitespace (so postfix expressions are not allowed)
+* If no base starting value is given, the enum will start from 0 and increment by 1 for each key. Otherwise, it will start with the base value and increment from that.
 
 **Hints**
 

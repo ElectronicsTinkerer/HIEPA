@@ -16,37 +16,91 @@ class Macro:
 def process(lines):
 
     in_mac = False
+    macs = []
     in_enum = False
     enum_val = 0
-    macs = []
+    enum_base = 0
+    enum_name = None
 
 
     # Perform macro/enum search
     for line in lines:
         content = line.ppline
 
-        # Detect end of macro
+        # ENUM was found, update its contents
+        if in_enum:
+            if content == "}":  # Detect end of enum
+                in_enum = False
+                line.ismacdef = True
+            else:               # Otherwise, change the line to be an "EQUate"
+                # Detect non-valid symbol characters
+                if not re.match(r"^[a-zA-Z0-9_\.]+$", content):
+                    pmsg(ERROR, f"Invalid character in symbol name", line)
+                else:
+                    line.ppline = (
+                        f"{enum_name + '.' if enum_name else ''}"
+                        f"{line.ppline} .equ {str(enum_base) + ' + ' if enum_base != 0 else ''}{enum_val}"
+                    )
+                enum_val += 1
+
+        # MACRO was found, update its contents
         if in_mac:
             line.ismacdef = True
-            if content == "}":
+            if content == "}":  # Detect end of macro
                 in_mac = False
-            else:
+            else:               # Otherwise, add the line to the macro's contents
                 macs[-1].lines.append(content)
             continue
 
         # Found an ENUM, add it to table
-        # match = re.search(f"^{ASM_MACRO_CHAR}\W*enum", content, flags=re.IGNORECASE)
-        # if match:
-        #     macro = content[match.span()[1]:].split(maxsplit=1)
-        #     print(macro)
-        #     in_enum = True
-        #     continue
+        match = re.search(f"^{ASM_MACRO_CHAR}\W*enum", content, flags=re.IGNORECASE)
+        if match:
+            enum_name = None
+            enum_base = 0
+            bargs = content[match.span()[1]:].split()
 
+            if len(bargs) < 2:
+                pmsg(ERROR, "Expected opening bracket for enum", line)
+
+            # There's args for the enum, then the user specified an enum identifier
+            len_bargs = len(bargs)
+            print(bargs, bargs)
+            if len_bargs > 1:
+                found_bracket = False
+                for i in range(len_bargs):
+                    if found_bracket:
+                        pmsg(ERROR, f"Unexpected token '{bargs[i]}' in enum definition", line)
+                    elif i == len_bargs - 1 and bargs[i] != '{':
+                        pmsg(ERROR, "Expected opening bracket for enum", line)
+                    elif bargs[i] == '{':
+                        found_bracket = True
+                    elif bargs[i][0] == '=':
+                        if enum_base != 0:
+                            pmsg(ERROR, f"Unexpected token '{bargs[i]}' in enum definition", line)
+                        if len(bargs[i]) < 2:
+                            pmsg(ERROR, f"Enum base value assignment expected expression", line)
+                        enum_base = bargs[i][1:]
+                    else:
+                        if enum_name != None:
+                            pmsg(ERROR, f"Unexpected token '{bargs[i]}' in enum definition", line)
+                    
+                        if bargs[i][0] == '@':
+                            pmsg(WARN, "Enum name does not require '@'. Did you mean to use a macro?", line)
+                        enum_name = bargs[i]
+
+            if len_bargs == 1 and bargs[1] != '{':
+                pmsg(ERROR, "Missing opening bracket on enum", line)
+
+            in_enum = True
+            enum_val = 0
+            line.ismacdef = True
+            continue
 
         # Found a MACRO, add it to table
         match = re.search(f"^{ASM_MACRO_CHAR}\W*macro", content, flags=re.IGNORECASE)
         if match:
             macro = content[match.span()[1]:].split(maxsplit=1)
+            print(macro)
             if len(macro) < 2:
                 pmsg(ERROR, "Expected opening bracket for macro", line)
 
@@ -57,7 +111,6 @@ def process(lines):
             if len_bargs > 1:
                 found_bracket = False
                 for i in range(len_bargs):
-                    print(bargs[i])
                     if found_bracket:
                         pmsg(ERROR, f"Unexpected token '{bargs[i]}' in macro definition", line)
                     elif i == len_bargs - 1 and bargs[i] != '{':
@@ -73,13 +126,13 @@ def process(lines):
             in_mac = True
             macs.append(Macro(macro[0], [], args))
             line.ismacdef = True
-            print(macro[0], args)  # DEBUG
+            # print(macro[0], args)  # DEBUG
             continue
 
     # DEBUG
-    print("MACS FOUND")
-    for mac in macs:
-        print(mac.name, mac.lines, mac.args)
+    # print("MACS FOUND")
+    # for mac in macs:
+    #     print(mac.name, mac.lines, mac.args)
     # END DEBUG
 
     # Perform macro/enum replacement
@@ -96,7 +149,7 @@ def process(lines):
             if re.search(rf'\b{mac.name}\b', content):
                 parts = content.split(maxsplit=1)
                 macro = parts[0]
-                print(mac.args, len(mac.args), len(parts))
+                # print(mac.args, len(mac.args), len(parts)) # DEBUG
 
                 # Only handle argument substitution if the macro has arguments
                 args = []
@@ -132,5 +185,6 @@ def process(lines):
                     new_lines.append(tline)
 
                 break # Done with line, move on to the next
+
     # exit(0)
     return new_lines

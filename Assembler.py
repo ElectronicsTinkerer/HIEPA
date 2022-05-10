@@ -120,7 +120,7 @@ def writerom8(addr, octet):
     global rom_size
     if addr >= rom_offset + rom_size:
         pmsg(ERROR, f"Data placed outside of ROM area", file_contents[line_num-1])
-    rom_contents[addr-rom_offset] = octet
+    rom_contents[addr-rom_offset] = octet & 0xff
 
 
 def writerom16(addr, word):
@@ -627,7 +627,7 @@ def parseargs(i, line, sym):
         if (instruction.reg == "A" and al) or (instruction.reg == "X" and xl):
             returnbytes.append((val >> 8) & 0xff)
         elif val > 0xff:
-            if not (ignore_warn_msg and pass_num == 1 ):
+            if not (ignore_warn_msg and pass_num == 1):
                 pmsg(WARN, f"Value is > 0xff with 8 bit reg", file_contents[line_num-1])
 
         return returnbytes
@@ -774,13 +774,13 @@ def parseline(line):
             c = ""
 
         # print(f"Char: {c}\tSymbol: {sym}")
-        if c.isalnum() or c == '_':
+        if c.isalnum() or c in ('_', '.'):
             sym += c
         elif len(sym) > 0:
             line_content = True # The line contains interesting content
 
             # It is the ORG directive, change the PC
-            if sym.lower() == "org":
+            if re.search(r"^.?org$", sym, flags=re.IGNORECASE):
                 tpc = parseexp(line[i+1:])
                 if pc == -1:    # On first ORG statement, set ROM offset
                     rom_offset = tpc
@@ -789,7 +789,7 @@ def parseline(line):
                 pc = tpc        # Update PC location
                 i = len(line)   # Done with line
 
-            # Check for instrucions
+            # Check for instructions
             elif sym.upper() in Instructions.INSTRUCTIONS:
 
                 # print("YES, found instruction")  # DEBUG
@@ -811,7 +811,7 @@ def parseline(line):
                 # print(f"Found Label: {sym} = ${pc:04X}")  # DEBUG
 
             # DataByte directive
-            elif sym.lower() in ("byt", "byte"):
+            elif re.search(r"^.?byte?$", sym, flags=re.IGNORECASE):
 
                 # Allow comma-delimited values
                 nums = parsecsv(line[i+1:])
@@ -839,7 +839,7 @@ def parseline(line):
                 i = len(line)   # Done with line
 
             # DataWord directive
-            elif sym.lower() == "word":
+            elif re.search(r"^.?word$", sym, flags=re.IGNORECASE):
 
                 # Allow comma-delimited values
                 nums = parsecsv(line[i+1:])
@@ -870,7 +870,7 @@ def parseline(line):
                 i = len(line)   # Done with line
 
             # Date directive
-            elif sym.lower() == "date":
+            elif re.search(r"^.?date$", sym, flags=re.IGNORECASE):
                 for b in bytes(datetime.now().isoformat(timespec='minutes'), "utf_8").decode("unicode_escape"):
                     val = ord(b)
                     writerom8(pc, val)
@@ -878,7 +878,7 @@ def parseline(line):
                     pc += 1
 
             #BuildNum directive
-            elif sym.lower() == "build":
+            elif re.search(r"^.?build$", sym, flags=re.IGNORECASE):
                 for b in bytes(f"{build_num:06}", "utf_8").decode("unicode_escape"):
                     val = ord(b)
                     writerom8(pc, val)
@@ -886,27 +886,27 @@ def parseline(line):
                     pc += 1
 
             # Equate
-            elif sym.lower() == "equ":
+            elif re.search(r"^.?equ$", sym, flags=re.IGNORECASE):
                 exp = line[i:]
                 val = parseexp(exp)
                 addsym(prev_sym, val, exp, pc)
                 i = len(line)   # Done with line
 
             # ROM directive, ignored on pass != 1
-            elif sym.lower() == "rom":
+            elif re.search(r"^.?rom$", sym, flags=re.IGNORECASE):
                 i = len(line)   # Done with line
 
             # Register width directives
-            elif sym.lower() == "al":
+            elif re.search(r"^.?al$", sym, flags=re.IGNORECASE):
                 al = True
                 i = len(line)   # Done with line
-            elif sym.lower() == "xl":
+            elif re.search(r"^.?xl$", sym, flags=re.IGNORECASE):
                 xl = True
                 i = len(line)   # Done with line
-            elif sym.lower() == "as":
+            elif re.search(r"^.?as$", sym, flags=re.IGNORECASE):
                 al = False
                 i = len(line)   # Done with line
-            elif sym.lower() == "xs":
+            elif re.search(r"^.?xs$", sym, flags=re.IGNORECASE):
                 xl = False
                 i = len(line)   # Done with line
 
@@ -920,7 +920,7 @@ def parseline(line):
 
             sym = ""
 
-        elif c in [' ', '\t', '.']:
+        elif c in [' ', '\t']:
             # Whitespace resets symbol being parsed
             sym = ""
         else:
