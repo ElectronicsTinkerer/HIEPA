@@ -16,16 +16,13 @@
 
 ## Code Improvements
 
-* If a symbol is unresolved when put into a .word directive, assembler prints warning that it is > 0xffff (when it should not)
-* Cannot load immedate (EX: lda #'-') with a character that is a math operator
+* Cannot load immediate (EX: lda #'-') with a character that is a math operator
 * Is symbol is < $100 and instruction does not have a ZP mode, an invalid addressing mode ERROR is thrown (when it should promote the value to abs addressing if available)
 * If '\>' is put in a string literal, the following is output during (a successful) assemblation:
 ```
 DeprecationWarning: invalid escape sequence '\>'
   for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):    # Only works with values [0..127]
 ```
-* `lda (dp),x` does not result in an invalid addressing mode message (when it should be invalid)
-* `cmd #' '` gets assembled to nothing with no warnings or errors thrown
 
 
 # DONE:
@@ -37,6 +34,13 @@ DeprecationWarning: invalid escape sequence '\>'
   -> Internally uses INTERNAL_PC_SYM to keep track of $
 * Add ENUM support (i.e. for zp locations)
   -> There's also enum "namespace" support
+* Add local labels to macros
+* Add "proper" asm macros
+  
+## Code Improvements (Bugs that have been fixed)
 
-## Code Improvements
 * Symbols now can contain '.' which allows for enum "namespaces"
+* `cmd #' '` gets assembled to nothing with no warnings or errors thrown
+* `lda (dp),x` does not result in an invalid addressing mode message (when it should be invalid)
+  -> This results in a warning that the addressing mode may not be what the programmer intended.
+* If a symbol is unresolved when put into a .word directive, assembler prints warning that it is > 0xffff (when it should not)

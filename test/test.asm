@@ -54,7 +54,14 @@ lbl3:
     .byt $ 
     .word $a0f5
     .byt $0f, 50, "Hello!", $00
-    
+    .word secondlabel
+    .byte secondlabel
+    .byt "\\> prompt"   ; Depreciation warning if onle single '\'
+    lda #secondlabel
+    lda secondlabel
+    INDEX_16
+    ldx #$ffff+2
+    ldx #1+secondlabel
 secondlabel:
     adc #$2673
     adc ($63)
@@ -71,3 +78,7 @@ secondlabel:
     BRANCH_TEST %00
     BRANCH_TEST $00
     BRANCH_TEST $ab
+
+    lda ($05),x         ; Should throw warning about potentially invalid addressing mode
+    lda ~($05),x        ; Should not throw warning about potentially invalid addressing mode
+    lda $05,x           ; Should assemble to the same as the above two liens

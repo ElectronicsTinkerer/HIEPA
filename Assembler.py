@@ -626,15 +626,18 @@ def parseargs(i, line, sym):
         # Check if value is 8 or 16 bit
         if (instruction.reg == "A" and al) or (instruction.reg == "X" and xl):
             returnbytes.append((val >> 8) & 0xff)
-        elif val > 0xff:
-            if not (ignore_warn_msg and pass_num == 1):
-                pmsg(WARN, f"Value is > 0xff with 8 bit reg", file_contents[line_num-1])
+            if ((val < 0 or val > 0xffff) and 
+                    not (pass_num == 1 and val == SYMVALUNK) and 
+                    not (ignore_warn_msg and pass_num == 1)):
+                pmsg(WARN, f"Value is outside range [0..0xffff] with 16 bit reg", file_contents[line_num-1])
+        elif val > 0xff or val < 0:
+            if not (pass_num == 1 and val == SYMVALUNK) and not (ignore_warn_msg and pass_num == 1):
+                pmsg(WARN, f"Value is outside range [0..0xff] with 8 bit reg", file_contents[line_num-1])
 
         return returnbytes
 
     # Indirect
     if operand[0] == "(":
-
         match = re.search(",\W*(x|X)\W*\)$", operand)
         if match:
             return getopcodebytes(operand[1:match.span()[0]], instruction.idrctx, instruction.iabsx, -1)
@@ -832,6 +835,8 @@ def parseline(line):
                     # Here's a direct number
                     else:
                         val = parseexp(num)
+                        if pass_num == 1 and val == SYMVALUNK:  # Suppress warning about SYMVALUNK being > 0xff
+                            val = SYMVALUNK & 0xff
                         writerom8(pc, val)
                         file_contents[line_num-1].rawbytes .append(val)
                         pc += 1
@@ -862,6 +867,8 @@ def parseline(line):
                     # Here's a direct number
                     else:
                         val = parseexp(num)
+                        if pass_num == 1 and val == SYMVALUNK: # Suppress warning about SYMVALUNK being > 0xffff
+                            val = SYMVALUNK & 0xffff
                         writerom16(pc, val)
                         file_contents[line_num-1].rawbytes.append(val & 0xff)
                         file_contents[line_num-1].rawbytes.append((val >> 8) & 0xff)
