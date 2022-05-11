@@ -38,6 +38,15 @@ __mac_done:
 !macro END_IF {
     !mpop if
 }
+!macro BEGIN_AGAIN {
+__begin_again:
+    !mpush begin_again __begin_again
+}
+
+!macro AGAIN {
+    jmp !mpop begin_again
+}
+
 
 mylabel:
 lbl:
@@ -95,7 +104,9 @@ secondlabel:
     jmp 5               ; jmp does not have a dp mode, make sure abs is assumed
     ; ldx #'-'
 
-    IF_EQ
-        lda #50
-    END_IF
-    nop
+    BEGIN_AGAIN
+        IF_EQ
+            lda #50
+        END_IF
+        nop
+    AGAIN

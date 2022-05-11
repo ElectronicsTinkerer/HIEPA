@@ -191,12 +191,10 @@ def process(lines):
 
                 # Handle macro stack operations
                 for i in range(len(temp_lines)):
-                    print(temp_lines[i])
                     # MPOP
-                    match = re.search(f"^{ASM_MACRO_CHAR}\W*mpop", temp_lines[i], flags=re.IGNORECASE)
+                    match = re.search(f"{ASM_MACRO_CHAR}\W*mpop", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
-                        print("POP", args)
                         if len(args) != 1:
                             pmsg(ERROR, f"Expected 1 argument to !mpop, got {len(args)}", line)
                         elif len(mac_stack) == 0:
@@ -208,20 +206,18 @@ def process(lines):
                             elif val[args[0]] == None: # No label given in mpush, don't convert line
                                 temp_lines[i] = ""
                             else:   # Replace !mpop with a label
-                                temp_lines[i] = f"{val[args[0]]}"
+                                temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{val[args[0]]}"
 
                     # MPUSH
                     match = re.search(f"^{ASM_MACRO_CHAR}\W*mpush", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
-                        print("PUSH", args)
                         len_args = len(args)
                         if len_args < 1 or len_args > 2:
                             pmsg(ERROR, f"Expected 1-2 arguments for !mpush, got {len_args}", line)
                         else:
                             elem = {args[0]:None}
                             if len_args == 2:
-                                print(args)
                                 elem[args[0]] = args[1] # Assign value to label name
                             mac_stack.append(elem)
                             temp_lines[i] = ""
