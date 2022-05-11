@@ -46,6 +46,9 @@ __begin_again:
 !macro AGAIN {
     jmp !mpop begin_again
 }
+!macro IN_IF {
+    !mpeek if
+}
 
 
 mylabel:
@@ -107,6 +110,8 @@ secondlabel:
     BEGIN_AGAIN
         IF_EQ
             lda #50
+            IN_IF
         END_IF
+        ; IN_IF           ; SHould throw a mismatched stack key identifier error
         nop
     AGAIN

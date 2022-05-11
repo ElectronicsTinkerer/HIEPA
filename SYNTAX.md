@@ -49,6 +49,11 @@ Want to use the assembler's internal macro stack?
 !macro MAC_2 {
     !mpop frame_name
 }
+
+; To check if a macro is within another block, use !mpeek
+!macro MAC_3 {
+    !mpeek frame_name
+}
 ```
 
 Notes:

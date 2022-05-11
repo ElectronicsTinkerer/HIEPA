@@ -222,10 +222,26 @@ def process(lines):
                             mac_stack.append(elem)
                             temp_lines[i] = ""
 
+                    # MPEEK - Check the top of the stack without popping (basically an ASSERT)
+                    match = re.search(f"{ASM_MACRO_CHAR}\W*mpeek", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 1:
+                            pmsg(ERROR, f"Expected 1 argument to !mpeek, got {len(args)}", line)
+                        elif len(mac_stack) == 0:
+                            pmsg(ERROR, "Attempted peek from empty macro stack", line)
+                        else:
+                            val = mac_stack[-1]
+                            if not args[0] in val:
+                                pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
+                            else: # Hide line from assembler
+                                temp_lines[i] = ""
 
                 line.ismacdef = True # Ignore original line in assembler
                 line.line = f";{line.line[1:]}"
                 for l in temp_lines:
+                    if l.strip() == "":
+                        continue
                     tline = FileLine.dupfileline(line)
                     tline.ppline = l
                     tline.line = f"    {l}{(20 - len(l))*' '}; MAC expansion of '{mac.name}'"
