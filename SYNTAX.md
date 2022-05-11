@@ -38,6 +38,23 @@ Notes:
 * Macro expansion does support forward referenced macros
 * Macros support local labels. Any labels defined in a macro that start with `__` are considered to be local to the macro's expansion
 
+Want to use the assembler's internal macro stack?
+```
+; To push onto the stack, use !mpush
+!macro MAC_1 {
+    !mpush frame_name [label:]
+}
+
+; To pop off the stack, use !mpop
+!macro MAC_2 {
+    !mpop frame_name
+}
+```
+
+Notes:
+* The stack processor has a check to ensure that a frame name popped off matches the one at the top of the stack
+* An optional label can be pushed with a frame name. If provided, then `!mpop` will be replaced by that label's name. The same local label rules apply to this label as well.
+
 **Assembler Enums**
 
 Very similar to the assembler macros:

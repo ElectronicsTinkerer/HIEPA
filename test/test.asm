@@ -31,6 +31,14 @@ __mac_done:
     l3
 }
 
+!macro IF_EQ {
+    !mpush if __end_if:
+    bne __end_if
+}
+!macro END_IF {
+    !mpop if
+}
+
 mylabel:
 lbl:
     lda #$00
@@ -85,3 +93,9 @@ secondlabel:
 
     ; clc 5               ; Invalid addressing mode
     jmp 5               ; jmp does not have a dp mode, make sure abs is assumed
+    ; ldx #'-'
+
+    IF_EQ
+        lda #50
+    END_IF
+    nop

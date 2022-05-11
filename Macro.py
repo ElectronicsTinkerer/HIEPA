@@ -136,6 +136,7 @@ def process(lines):
     # Perform macro/enum replacement
     new_lines = []
     mac_label_num = 0
+    mac_stack = []
     for line in lines:
         new_lines.append(line)
 
@@ -188,6 +189,43 @@ def process(lines):
                     for l in local_labels.keys():
                         temp_lines[i] = re.sub(l, local_labels[l], temp_lines[i])
 
+                # Handle macro stack operations
+                for i in range(len(temp_lines)):
+                    print(temp_lines[i])
+                    # MPOP
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*mpop", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        print("POP", args)
+                        if len(args) != 1:
+                            pmsg(ERROR, f"Expected 1 argument to !mpop, got {len(args)}", line)
+                        elif len(mac_stack) == 0:
+                            pmsg(ERROR, "Attempted pop from empty macro stack", line)
+                        else:
+                            val = mac_stack.pop()
+                            if not args[0] in val:
+                                pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
+                            elif val[args[0]] == None: # No label given in mpush, don't convert line
+                                temp_lines[i] = ""
+                            else:   # Replace !mpop with a label
+                                temp_lines[i] = f"{val[args[0]]}"
+
+                    # MPUSH
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*mpush", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        print("PUSH", args)
+                        len_args = len(args)
+                        if len_args < 1 or len_args > 2:
+                            pmsg(ERROR, f"Expected 1-2 arguments for !mpush, got {len_args}", line)
+                        else:
+                            elem = {args[0]:None}
+                            if len_args == 2:
+                                print(args)
+                                elem[args[0]] = args[1] # Assign value to label name
+                            mac_stack.append(elem)
+                            temp_lines[i] = ""
+
 
                 line.ismacdef = True # Ignore original line in assembler
                 line.line = f";{line.line[1:]}"
@@ -200,5 +238,7 @@ def process(lines):
 
                 break # Done with line, move on to the next
 
+    # for line in new_lines:
+    #     if not line.ismacdef: print(line.ppline)
     # exit(0)
     return new_lines

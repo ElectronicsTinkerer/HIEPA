@@ -13,7 +13,6 @@
 * Add ability to specify location where `#load`ed functions get placed (and which ones are loaded)
 * Add preprocessor `#load "file.inc" blocks x@$f000, y@myLabel, z@45809` directive which is like a python `from filename import x, y, z`
 * Add `#beginblock <name>`/`#endblock` preprocessor directives for selectively `#load`ing in blocks
-* User-accessible assembler stack for macros?
 
 ## Code Improvements
 
@@ -36,13 +35,14 @@ DeprecationWarning: invalid escape sequence '\>'
   -> There's also enum "namespace" support
 * Add local labels to macros
 * Add "proper" asm macros
+* User-accessible assembler stack for macros
   
 ## Code Improvements (Bugs that have been fixed)
 
 * Symbols now can contain '.' which allows for enum "namespaces"
 * `cmd #' '` gets assembled to nothing with no warnings or errors thrown
 * `lda (dp),x` does not result in an invalid addressing mode message (when it should be invalid)
-  -> This results in a warning that the addressing mode may not be what the programmer intended.
+  -> Fix: This results in a warning that the addressing mode may not be what the programmer intended.
 * If a symbol is unresolved when put into a .word directive, assembler prints warning that it is > 0xffff (when it should not)
 * Is symbol is < $100 and instruction does not have a ZP mode, an invalid addressing mode ERROR is thrown (when it should promote the value to abs addressing if available)
   
