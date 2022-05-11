@@ -82,3 +82,6 @@ secondlabel:
     lda ($05),x         ; Should throw warning about potentially invalid addressing mode
     lda ~($05),x        ; Should not throw warning about potentially invalid addressing mode
     lda $05,x           ; Should assemble to the same as the above two liens
+
+    ; clc 5               ; Invalid addressing mode
+    jmp 5               ; jmp does not have a dp mode, make sure abs is assumed

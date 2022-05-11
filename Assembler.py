@@ -176,7 +176,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         returnbytes.append(checkreturnaddrmode(instruction_d))
         returnbytes.append(val & 0xff)
         file_contents[line_num - 1].addr_mode = 1 # Force addressing mode for next pass
-    elif (val < 0x010000 and val >= 0x000100 and addr_mode_force == 0 and instruction_a != -1) \
+    elif (val < 0x010000 and val >= 0x000000 and addr_mode_force == 0 and instruction_a != -1) \
             or addr_mode_force == 2 \
             or (val == SYMVALUNK and instruction_a != -1) \
             or (instruction_d == -1 and instruction_a != -1 and instruction_l == -1):
@@ -184,7 +184,7 @@ def getopcodebytes(operand, instruction_d, instruction_a, instruction_l):
         returnbytes.append(val & 0xff)
         returnbytes.append((val >> 8) & 0xff)
         file_contents[line_num - 1].addr_mode = 2  # Force addressing mode for next pass
-    elif (val <= 0xffffff and val >= 0x010000 and addr_mode_force == 0 and instruction_l != -1) \
+    elif (val <= 0xffffff and val >= 0x000000 and addr_mode_force == 0 and instruction_l != -1) \
             or addr_mode_force == 3:
         returnbytes.append(checkreturnaddrmode(instruction_l))
         returnbytes.append(val & 0xff)
@@ -626,8 +626,8 @@ def parseargs(i, line, sym):
         # Check if value is 8 or 16 bit
         if (instruction.reg == "A" and al) or (instruction.reg == "X" and xl):
             returnbytes.append((val >> 8) & 0xff)
-            if ((val < 0 or val > 0xffff) and 
-                    not (pass_num == 1 and val == SYMVALUNK) and 
+            if ((val < 0 or val > 0xffff) and
+                    not (pass_num == 1 and val == SYMVALUNK) and
                     not (ignore_warn_msg and pass_num == 1)):
                 pmsg(WARN, f"Value is outside range [0..0xffff] with 16 bit reg", file_contents[line_num-1])
         elif val > 0xff or val < 0:

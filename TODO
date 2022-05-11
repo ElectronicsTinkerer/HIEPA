@@ -8,16 +8,16 @@
 * Add CLI arg(s) that allow for auto-uploading of output bin to a remote device via a serial port
 * Add CLI arg(s) to define macros
 * Better preprocessor removal of comments (Currently, "First half \";\" second half" will have the second half removed)
-* Add indicator on CLI symbol output to indicate is a symbol is refrenced
+* Add indicator on CLI symbol output to indicate if a symbol is referenced
 * Add syntax to specify the address that a label is placed (e.g. `label: @$700`)
 * Add ability to specify location where `#load`ed functions get placed (and which ones are loaded)
 * Add preprocessor `#load "file.inc" blocks x@$f000, y@myLabel, z@45809` directive which is like a python `from filename import x, y, z`
 * Add `#beginblock <name>`/`#endblock` preprocessor directives for selectively `#load`ing in blocks
+* User-accessible assembler stack for macros?
 
 ## Code Improvements
 
 * Cannot load immediate (EX: lda #'-') with a character that is a math operator
-* Is symbol is < $100 and instruction does not have a ZP mode, an invalid addressing mode ERROR is thrown (when it should promote the value to abs addressing if available)
 * If '\>' is put in a string literal, the following is output during (a successful) assemblation:
 ```
 DeprecationWarning: invalid escape sequence '\>'
@@ -44,3 +44,5 @@ DeprecationWarning: invalid escape sequence '\>'
 * `lda (dp),x` does not result in an invalid addressing mode message (when it should be invalid)
   -> This results in a warning that the addressing mode may not be what the programmer intended.
 * If a symbol is unresolved when put into a .word directive, assembler prints warning that it is > 0xffff (when it should not)
+* Is symbol is < $100 and instruction does not have a ZP mode, an invalid addressing mode ERROR is thrown (when it should promote the value to abs addressing if available)
+  

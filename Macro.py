@@ -1,6 +1,5 @@
 # Handles the ASM macros and enums
 
-from threading import local
 from FileLine import FileLine
 from Msg import *
 import re
