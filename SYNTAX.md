@@ -83,6 +83,15 @@ How about using conditional expansion of macros?
 }
 ```
 
+Need to check if a part of your if structures is reached when it shouldn't?
+```
+!macro MAC_7 @arg {
+    !if @arg == INVALID_VALUE
+        !fail [error message]
+    !endif
+}
+```
+
 Notes:
 * The stack processor has a check to ensure that a frame name popped off matches the one at the top of the stack
 * An optional label can be pushed with a frame name. If provided, then `!mpop` will be replaced by that label's name. The same local label rules apply to this label as well.

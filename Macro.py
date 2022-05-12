@@ -339,7 +339,11 @@ def process(lines):
                     match = re.search(f"^{ASM_MACRO_CHAR}\W*fail", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
-                            pmsg(ERROR, "Encountered !FAIL", line)
+                            msg = temp_lines[i][match.span()[1]:].strip()
+                            if msg != "":
+                                pmsg(ERROR, f"Encountered !FAIL\n\tMessage: '{msg}'", line)
+                            else:
+                                pmsg(ERROR, f"Encountered !FAIL", line)
 
                     # SETVAR
                     match = re.search(f"^{ASM_MACRO_CHAR}\W*setvar", temp_lines[i], flags=re.IGNORECASE)
