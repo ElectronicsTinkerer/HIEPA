@@ -59,6 +59,16 @@ Want to use the assembler's internal macro stack?
 !macro MAC_35 {
     [jmp] !mpeek frame_name
 }
+
+; To swap the top two elements on the macro stack, use !mswap
+!macro MAC_36 {
+    !mswap
+}
+
+; To remove the top element from the stack without returning its value, use !mdrop
+!macro MAC_37 {
+    !mdrop
+}
 ```
 
 Want to use temporary assembler variables (like #define)?

@@ -189,7 +189,7 @@ def process(lines):
                 # Handle naming of local labels
                 for i in range(len(temp_lines)):
                     for l in local_labels.keys():
-                        temp_lines[i] = re.sub(l, local_labels[l], temp_lines[i])
+                        temp_lines[i] = re.sub(rf"\b{l}\b", local_labels[l], temp_lines[i])
 
                 # Handle macro stack operations
                 for i in range(len(temp_lines)):
@@ -251,13 +251,41 @@ def process(lines):
                         if len(args) != 1:
                             pmsg(ERROR, f"Expected 1 argument to !mtest, got {len(args)}", line)
                         elif len(mac_stack) == 0:
-                            pmsg(ERROR, "Attempted peek from empty macro stack", line)
+                            pmsg(ERROR, "Attempted test on empty macro stack", line)
                         else:
                             val = mac_stack[-1]
                             if not args[0] in val:
                                 pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
                             else: # Hide line from assembler
                                 temp_lines[i] = ""
+                        continue
+
+                    # MSWAP - Swap the top two elements on the macro stack
+                    match = re.search(f"{ASM_MACRO_CHAR}\W*mswap", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 0:
+                            pmsg(ERROR, f"Expected 0 arguments to !mswap, got {len(args)}", line)
+                        elif len(mac_stack) < 2:
+                            pmsg(ERROR, "Attempted swap on short macro stack", line)
+                        else:
+                            val = mac_stack[-1]
+                            mac_stack[-1] = mac_stack[-2]
+                            mac_stack[-2] = val
+                            temp_lines[i] = "" # Hide line from assembler
+                        continue
+
+                    # MDROP - Remove the top element from the macro stack
+                    match = re.search(f"{ASM_MACRO_CHAR}\W*mdrop", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 0:
+                            pmsg(ERROR, f"Expected 0 arguments to !mdrop, got {len(args)}", line)
+                        elif len(mac_stack) == 0:
+                            pmsg(ERROR, "Attempted drop from empty macro stack", line)
+                        else:
+                            mac_stack.pop()
+                            temp_lines[i] = ""
                         continue
 
                 # Handle macro IF/ELSE/ENDIF/FAIL/VAR/IFVAR operators

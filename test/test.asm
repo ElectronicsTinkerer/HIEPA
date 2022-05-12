@@ -86,8 +86,14 @@ __begin_again:
     !mpush go __go
     !mtest go
     jmp !mpeek go
+    !mpush go2 __go2
+    !mswap
 __go:
-;    !mpop __go
+    jmp !mpop go
+    nop
+    ; !mdrop            ; Should cause !mpop go2 to give an empty macro stack error
+__go2:
+    jmp !mpop go2
 } 
 
     VAR_SET

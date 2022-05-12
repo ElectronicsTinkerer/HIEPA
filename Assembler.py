@@ -77,7 +77,7 @@ def getsym(sym, internal=False):
         return un_symbol_table[sym].val
 
     if not internal:
-        if not (ignore_info_msg and pass_num == 1):
+        if (not (ignore_info_msg and pass_num == 1)) and (len(sym) < 2 or sym[:2] != "__"): # Also ignore macro hidden labels
             pmsg(INFO,f"Unknown symbol '{sym}'", file_contents[line_num-1], APASS)
         needs_another_pass = True
     return SYMVALUNK
