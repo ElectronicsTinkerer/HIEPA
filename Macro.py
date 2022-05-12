@@ -1,5 +1,6 @@
 # Handles the ASM macros and enums
 
+from numpy import block
 from FileLine import FileLine
 from Msg import *
 import re
@@ -137,6 +138,7 @@ def process(lines):
     new_lines = []
     mac_label_num = 0
     mac_stack = []
+    mac_vars = {}
     for line in lines:
         new_lines.append(line)
 
@@ -207,6 +209,7 @@ def process(lines):
                                 temp_lines[i] = ""
                             else:   # Replace !mpop with a label
                                 temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{val[args[0]]}"
+                        continue
 
                     # MPUSH
                     match = re.search(f"^{ASM_MACRO_CHAR}\W*mpush", temp_lines[i], flags=re.IGNORECASE)
@@ -221,6 +224,7 @@ def process(lines):
                                 elem[args[0]] = args[1] # Assign value to label name
                             mac_stack.append(elem)
                             temp_lines[i] = ""
+                        continue
 
                     # MPEEK - Check the top of the stack without popping (basically an ASSERT)
                     match = re.search(f"{ASM_MACRO_CHAR}\W*mpeek", temp_lines[i], flags=re.IGNORECASE)
@@ -236,6 +240,121 @@ def process(lines):
                                 pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
                             else: # Hide line from assembler
                                 temp_lines[i] = ""
+                        continue
+
+                # Handle macro IF/ELSE/ENDIF/FAIL/VAR/IFVAR operators
+                block_level = 0
+                block_use_stack = []
+                for i in range(len(temp_lines)):
+                    # IF
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*if\W+", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        len_args = len(args)
+                        if len_args != 3:
+                            pmsg(ERROR, f"Expected 3 arguments to !if, got {len(args)}", line)
+                        else:
+                            block_level += 1
+                            temp_lines[i] = ""
+                            if block_level > 1 and not block_use_stack[-1]:
+                                block_use_stack.append(False)
+                            elif args[1] == "==":
+                                if args[0] == args[2]:
+                                    block_use_stack.append(True)
+                                else:
+                                    block_use_stack.append(False)
+                            elif args[1] == "!=":
+                                if args[0] != args[2]:
+                                    block_use_stack.append(True)
+                                else:
+                                    block_use_stack.append(False)
+                            else:
+                                pmsg(ERROR, f"Unknown macro comparison operator '{args[1]}'", line)
+                        continue
+
+                    # IFVAR
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*ifvar", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        len_args = len(args)
+                        if len_args != 3:
+                            pmsg(ERROR, f"Expected 3 arguments to !ifvar, got {len(args)}", line)
+                        else:
+                            block_level += 1
+                            temp_lines[i] = ""
+                            if block_level > 1 and not block_use_stack[-1]:
+                                block_use_stack.append(False)
+                            else:
+                                if args[0] not in mac_vars:
+                                    pmsg(WARN, f"Unset macro variable '{args[0]}', defaulting to FALSE", line)
+                                    block_use_stack.append(False)
+                                else:
+                                    if args[1] == "==":
+                                        if mac_vars[args[0]] == args[2]:
+                                            block_use_stack.append(True)
+                                        else:
+                                            block_use_stack.append(False)
+                                    elif args[1] == "!=":
+                                        if mac_vars[args[0]] != args[2]:
+                                            block_use_stack.append(True)
+                                        else:
+                                            block_use_stack.append(False)
+                                    else:
+                                        pmsg(ERROR, f"Unknown macro comparison operator '{args[1]}'", line)
+                        continue
+
+                    # ENDIF
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*endif", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        len_args = len(args)
+                        if len_args != 0:
+                            pmsg(ERROR, f"Expected 0 arguments to !endif, got {len(args)}", line)
+                        elif block_level == 0:
+                            pmsg(ERROR, f"Encountered end of block when not in block", line)
+                        else:
+                            block_level -= 1
+                            block_use_stack.pop()
+                            temp_lines[i] = ""
+                        continue
+
+                    # ELSE
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*else", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        len_args = len(args)
+                        if len_args != 0:
+                            pmsg(ERROR, f"Expected 0 arguments to !else, got {len(args)}", line)
+                        elif block_level == 0:
+                            pmsg(ERROR, f"Encountered !else when not in block", line)
+                        else:
+                            temp_lines[i] = ""
+                            if block_level == 1 or (block_level > 1 and block_use_stack[-2]):
+                                # Invert the use stack value
+                                val = not block_use_stack.pop()
+                                block_use_stack.append(val)
+                        continue
+
+                    # FAIL
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*fail", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            pmsg(ERROR, "Encountered !FAIL", line)
+
+                    # SETVAR
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*setvar", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        len_args = len(args)
+                        if len_args != 2:
+                            pmsg(ERROR, f"Expected 2 arguments to !setvar, got {len(args)}", line)
+                        else:
+                            mac_vars[args[0]] = args[1]
+                            temp_lines[i] = ""
+
+                    # Done checking for structure, now handle including of lines
+                    if block_level > 0 and not block_use_stack[-1]:
+                        temp_lines[i] = ""
 
                 line.ismacdef = True # Ignore original line in assembler
                 line.line = f";{line.line[1:]}"

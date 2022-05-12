@@ -56,6 +56,33 @@ Want to use the assembler's internal macro stack?
 }
 ```
 
+Want to use temporary assembler variables (like #define)?
+```
+!macro MAC_4 {
+    !setvar my_var <value>
+}
+!macro MAC_5 {
+    !ifvar my_var == <test value>
+        <some code>
+    !endif
+}
+```
+
+How about using conditional expansion of macros?
+```
+!macro MAC_6 @arg {
+    !if @arg == A
+        <some code>
+    !else
+        !ifvar my_var != XL      ; my_var is a macro variable, defined by !setvar
+            <some other code>
+        !else
+            <finally, another option>
+        !endif
+    !endif
+}
+```
+
 Notes:
 * The stack processor has a check to ensure that a frame name popped off matches the one at the top of the stack
 * An optional label can be pushed with a frame name. If provided, then `!mpop` will be replaced by that label's name. The same local label rules apply to this label as well.

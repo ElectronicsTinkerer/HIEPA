@@ -50,7 +50,41 @@ __begin_again:
     !mpeek if
 }
 
+!macro POP @reg {
+    !if @reg == A
+        pla
+    !else 
+        !if @reg == X
+            plx
+    !else
+        !if @reg == Y
+            ply
+    !else
+        !fail           ; Invalid reg, halt assembly
+    !endif
+    !endif
+    !endif
+}
 
+!macro VAR_SET {
+    !setvar MyVar HELLO
+}
+
+!macro VAR_IF {
+    !ifvar MyVar != HELLO
+        nop
+    !else
+        !ifvar otherVar == Yes
+            lda #$0f
+        !else
+            ldx <$
+        !endif
+    !endif
+}
+
+    VAR_SET
+    POP A
+    VAR_IF
 mylabel:
 lbl:
     lda #$00
