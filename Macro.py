@@ -206,7 +206,7 @@ def process(lines):
                             if not args[0] in val:
                                 pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
                             elif val[args[0]] == None: # No label given in mpush, don't convert line
-                                temp_lines[i] = ""
+                                temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}"
                             else:   # Replace !mpop with a label
                                 temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{val[args[0]]}"
                         continue
@@ -226,12 +226,30 @@ def process(lines):
                             temp_lines[i] = ""
                         continue
 
-                    # MPEEK - Check the top of the stack without popping (basically an ASSERT)
+                    # MPEEK - Get the top of stack without popping
                     match = re.search(f"{ASM_MACRO_CHAR}\W*mpeek", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
                         if len(args) != 1:
                             pmsg(ERROR, f"Expected 1 argument to !mpeek, got {len(args)}", line)
+                        elif len(mac_stack) == 0:
+                            pmsg(ERROR, "Attempted peek from empty macro stack", line)
+                        else:
+                            val = mac_stack[-1]
+                            if not args[0] in val:
+                                pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
+                            elif val[args[0]] == None: # No label given in mpush, don't convert line
+                                temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}"
+                            else:   # Replace !mpeek with a label
+                                temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{val[args[0]]}"
+                        continue
+
+                    # MTEST - Check the top of the stack without popping (basically an ASSERT)
+                    match = re.search(f"{ASM_MACRO_CHAR}\W*mtest", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 1:
+                            pmsg(ERROR, f"Expected 1 argument to !mtest, got {len(args)}", line)
                         elif len(mac_stack) == 0:
                             pmsg(ERROR, "Attempted peek from empty macro stack", line)
                         else:

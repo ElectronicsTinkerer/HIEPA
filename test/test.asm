@@ -82,9 +82,18 @@ __begin_again:
     !endif
 }
 
+!macro PUSHPOP {
+    !mpush go __go
+    !mtest go
+    jmp !mpeek go
+__go:
+;    !mpop __go
+} 
+
     VAR_SET
     POP A
     VAR_IF
+    PUSHPOP
 mylabel:
 lbl:
     lda #$00

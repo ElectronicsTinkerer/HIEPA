@@ -47,12 +47,17 @@ Want to use the assembler's internal macro stack?
 
 ; To pop off the stack, use !mpop
 !macro MAC_2 {
-    !mpop frame_name
+    [jmp] !mpop frame_name
 }
 
-; To check if a macro is within another block, use !mpeek
+; To check if a macro is within another block, use !mtest
 !macro MAC_3 {
-    !mpeek frame_name
+    !mtest frame_name
+}
+
+; To peek the top value on the macro stack, use !mpeek
+!macro MAC_35 {
+    [jmp] !mpeek frame_name
 }
 ```
 
