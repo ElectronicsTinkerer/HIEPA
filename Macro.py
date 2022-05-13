@@ -406,6 +406,9 @@ def process(lines):
                     if block_level > 0 and not block_use_stack[-1]:
                         temp_lines[i] = ""
 
+                if block_level != 0:
+                    pmsg(ERROR, "Unbalanced macro stack at end", line)
+
                 line.ismacdef = True # Ignore original line in assembler
                 line.line = f";{line.line[1:]}"
                 for l in temp_lines:
