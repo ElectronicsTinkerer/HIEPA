@@ -57,7 +57,14 @@ Want to use the assembler's internal macro stack?
 
 ; To peek the top value on the macro stack, use !mpeek
 !macro MAC_35 {
-    [jmp] !mpeek frame_name
+    [jmp] !mpeek
+}
+
+; To peek the top key on the macro stack, use !mpeek_key
+!macro MAC_355 {
+    !if frame_name == !mpeek_key
+        <code>
+    !endif
 }
 
 ; To swap the top two elements on the macro stack, use !mswap

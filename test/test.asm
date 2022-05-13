@@ -47,7 +47,7 @@ __begin_again:
     jmp !mpop begin_again
 }
 !macro IN_IF {
-    !mpeek if
+    !mtest if
 }
 
 !macro POP @reg {
@@ -85,7 +85,7 @@ __begin_again:
 !macro PUSHPOP {
     !mpush go __go
     !mtest go
-    jmp !mpeek go
+    jmp !mpeek
     !mpush go2 __go2
     !mswap
 __go:
@@ -94,6 +94,10 @@ __go:
     ; !mdrop            ; Should cause !mpop go2 to give an empty macro stack error
 __go2:
     jmp !mpop go2
+    !mpush hello val
+    !if hello != !mpeek_key
+        dea             ; Check mpeek_key
+    !endif
 } 
 
     VAR_SET
