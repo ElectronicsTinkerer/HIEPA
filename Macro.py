@@ -193,6 +193,32 @@ def process(lines):
 
                 # Handle macro stack operations
                 for i in range(len(temp_lines)):
+                    # MPEEK and MPEEK_KEY must be first in the order of operations
+                    # This is to guarantee the ability to substitute a popped value into the
+                    # other stack operators
+                    # MPEEK - Get the top of stack without popping
+                    match = re.search(rf"{ASM_MACRO_CHAR}\bmpeek\b", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        if len(mac_stack) == 0:
+                            pmsg(ERROR, "Attempted peek from empty macro stack", line)
+                        else:
+                            val = mac_stack[-1]
+                            temp_lines[i] = re.sub(rf"{ASM_MACRO_CHAR}\bmpeek\b", list(val.values())[0], temp_lines[i])
+                        # continue
+
+                    # MPEEK_KEY - Get the top key on the stack without popping
+                    match = re.search(rf"{ASM_MACRO_CHAR}\bmpeek_key\b", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 0:
+                            pmsg(ERROR, f"Expected 0 arguments to !mpeek_key, got {len(args)}", line)
+                        elif len(mac_stack) == 0:
+                            pmsg(ERROR, "Attempted peek key from empty macro stack", line)
+                        else:
+                            val = mac_stack[-1]
+                            temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{list(val.keys())[0]}"
+                        # continue
+
                     # MPOP
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmpop\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
@@ -226,29 +252,6 @@ def process(lines):
                             temp_lines[i] = ""
                         continue
 
-                    # MPEEK - Get the top of stack without popping
-                    match = re.search(rf"{ASM_MACRO_CHAR}\bmpeek\b", temp_lines[i], flags=re.IGNORECASE)
-                    if match:
-                        if len(mac_stack) == 0:
-                            pmsg(ERROR, "Attempted peek from empty macro stack", line)
-                        else:
-                            val = mac_stack[-1]
-                            temp_lines[i] = re.sub(rf"{ASM_MACRO_CHAR}\bmpeek\b", list(val.values())[0], temp_lines[i])
-                        continue
-
-                    # MPEEK_KEY - Get the top key on the stack without popping
-                    match = re.search(rf"{ASM_MACRO_CHAR}\bmpeek_key\b", temp_lines[i], flags=re.IGNORECASE)
-                    if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 0:
-                            pmsg(ERROR, f"Expected 0 arguments to !mpeek_key, got {len(args)}", line)
-                        elif len(mac_stack) == 0:
-                            pmsg(ERROR, "Attempted peek key from empty macro stack", line)
-                        else:
-                            val = mac_stack[-1]
-                            temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{list(val.keys())[0]}"
-                        continue
-
                     # MTEST - Check the top of the stack without popping (basically an ASSERT)
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmtest\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
@@ -264,7 +267,6 @@ def process(lines):
                             else: # Hide line from assembler
                                 temp_lines[i] = ""
                         continue
-
 
                     # MROT - Rotate the top three elements on the macro stack ( 1 2 3 ==> 2 3 1)
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmrot\b", temp_lines[i], flags=re.IGNORECASE)
@@ -297,6 +299,22 @@ def process(lines):
                             temp_lines[i] = "" # Hide line from assembler
                         continue
 
+                    # MDUP - Duplicate a stack item at an index to the top of the stack
+                    match = re.search(rf"{ASM_MACRO_CHAR}\bmdupi\b", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 1:
+                            pmsg(ERROR, f"Expected 1 argument to !mdupi, got {len(args)}", line)
+                        if not args[0].isdigit():
+                            pmsg(ERROR, f"Expected base-10 number for !mdupi, got '{args[0]}'", line)
+                        val = int(args[0], 10)
+                        if len(mac_stack) < val+1:
+                            pmsg(ERROR, "Attempted dupi on short macro stack", line)
+                        else:
+                            mac_stack.append(mac_stack[-val-1])
+                            temp_lines[i] = "" # Hide line from assembler
+                        continue
+
                     # MDROP - Remove the top element from the macro stack
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmdrop\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
@@ -308,6 +326,25 @@ def process(lines):
                         else:
                             mac_stack.pop()
                             temp_lines[i] = ""
+                        continue
+
+                    # MSTACKDUMP - Print the entire macro stack
+                    match = re.search(rf"{ASM_MACRO_CHAR}\bmstackdump\b", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 0:
+                            pmsg(ERROR, f"Expected 0 arguments to !mstackdump, got {len(args)}", line)
+
+                        dump_text = "MACRO STACK DUMP:\n"
+                        for f in mac_stack:
+                            key = list(f.keys())[0]
+                            val = list(f.values())[0]
+                            l = len(key)
+                            dump_text += f"{key} {(16-l)*'.'} : {val}\n"
+
+                        pmsg(INFO, dump_text, line)
+
+                        temp_lines[i] = ""
                         continue
 
                 # Handle macro IF/ELSE/ENDIF/FAIL/VAR/IFVAR operators
@@ -424,6 +461,25 @@ def process(lines):
                         else:
                             mac_vars[args[0]] = args[1]
                             temp_lines[i] = ""
+
+                    # MVARDUMP - Print all macro variables
+                    match = re.search(rf"{ASM_MACRO_CHAR}\bmvardump\b", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 0:
+                            pmsg(ERROR, f"Expected 0 arguments to !mvardump, got {len(args)}", line)
+
+                        dump_text = "MACRO VARIABLE DUMP:\n"
+                        for (key, val) in mac_vars.items():
+                            # key = list(f.keys())[0]
+                            # val = list(f.values())[0]
+                            l = len(key)
+                            dump_text += f"{key} {(16-l)*'.'} : {val}\n"
+
+                        pmsg(INFO, dump_text, line)
+
+                        temp_lines[i] = ""
+                        continue
 
                     # Done checking for structure, now handle including of lines
                     if block_level > 0 and not block_use_stack[-1]:

@@ -121,11 +121,20 @@ __go2:
     !endif
 }
 
+!macro MSTACKVARS {
+    !mpush stack_var
+    !mstackdump
+    !mvardump
+    !mdupi 4
+    !mstackdump
+}
+
     VAR_SET
     POP A
     VAR_IF
     PUSHPOP
     ROT
+    MSTACKVARS
 mylabel:
 lbl:
     lda #$00

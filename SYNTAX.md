@@ -42,43 +42,88 @@ Want to use the assembler's internal macro stack?
 ```
 ; To push onto the stack, use !mpush
 !macro MAC_1 {
+    ; Stack: 1 2 3 4
     !mpush frame_name [label:]
+    ; Stack 1 2 3 4 frame_name
 }
 
 ; To pop off the stack, use !mpop
 !macro MAC_2 {
-    [jmp] !mpop frame_name
+    ; Stack: 1 2 3 4
+    ; Below expands to `jmp 4`
+    jmp !mpop frame_name
+    ; Stack: 1 2 3
 }
 
 ; To check if a macro is within another block, use !mtest
 !macro MAC_3 {
+    ; Stack: 1 2 3 4
     !mtest frame_name
+    ; Stack: 1 2 3 4
 }
 
 ; To peek the top value on the macro stack, use !mpeek
 !macro MAC_35 {
-    [jmp] !mpeek
+    ; Stack: 1 2 3 4:val
+    ; Below expands to `jmp val`
+    jmp !mpeek
+    ; Stack: 1 2 3 4
 }
 
 ; To peek the top key on the macro stack, use !mpeek_key
 !macro MAC_355 {
+    ; Stack: 1 2 3 4
+    ; below expands to `!if frame_name == 4`
     !if frame_name == !mpeek_key
+        ; Stack: 1 2 3 4
         <code>
     !endif
 }
 
 ; To swap the top two elements on the macro stack, use !mswap
 !macro MAC_36 {
+    ; Stack: 1 2 3 4
     !mswap
+    ; Stack: 1 2 4 3
 }
 
 ; To remove the top element from the stack without returning its value, use !mdrop
 !macro MAC_37 {
+    ; Stack: 1 2 3 4
     !mdrop
+    ; Stack: 1 2 3
+}
+
+; To rotate the top three elements on the stack, use !mrot
+!macro MAC_38 {
+    ; Stack: 1 2 3 4
+    !mrot
+    ; Stack: 1 3 4 2
+}
+
+; To get a stack element value from an arbitrary index, use !mdupi
+!macro MAC_39 {
+    ; Stack: 1 2 3 4
+    !mdupi 1
+    ; Stack: 1 2 3 4 1
+    !mdupi 0
+    ; Stack: 1 2 3 4 1 1
+}
+
+; To print out the macro stack and macro variables during assembly, use !mdump
+!macro MAC_40 {
+    ; Stack: 1 2:__loop 3 x_val:val
+    !mstackdump
+    ; Output:
+    ; MACRO STACK DUMP:
+    ; 1 ................ : 
+    ; 2 ................ : __loop
+    ; 3 ................ : 
+    ; x_val ............ : val
 }
 ```
 
-Want to use temporary assembler variables (like #define)?
+Want to use temporary assembler variables like #define, but better?
 ```
 !macro MAC_4 {
     !setvar my_var <value>
@@ -111,6 +156,19 @@ Need to check if a part of your if structures is reached when it shouldn't?
     !if @arg == INVALID_VALUE
         !fail [error message]
     !endif
+}
+```
+
+How about viewing the currently defined macro variables?
+```
+!macro MAC_8 {
+    ; Vars: AL:FALSE mem_size:1024
+    !mvardump
+    ; Output
+    ; MACRO VARIABLE DUMP:
+    ; AL ............... : FALSE
+    ; mem_size ......... : 1024
+    ; on line 90 of file myfile.asm
 }
 ```
 
