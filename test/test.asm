@@ -85,7 +85,7 @@ __begin_again:
 !macro PUSHPOP {
     !mpush go __go
     !mtest go
-    jmp !mpeek
+    jmp !mpeek+2
     !mpush go2 __go2
     !mswap
 __go:
@@ -100,10 +100,32 @@ __go2:
     !endif
 } 
 
+!macro ROT {
+    !mpush test1
+    !mpush test2
+    !mpush test3
+    !mrot
+    !if test1 != !mpeek_key
+        !fail ROT didn't work!
+    !else
+        !mrot
+        !if test2 != !mpeek_key
+            !fail ROT didn't work!
+    !else
+        !mrot
+        !if test3 != !mpeek_key
+            !fail ROT didn't work!
+    !else
+    !endif
+    !endif
+    !endif
+}
+
     VAR_SET
     POP A
     VAR_IF
     PUSHPOP
+    ROT
 mylabel:
 lbl:
     lda #$00

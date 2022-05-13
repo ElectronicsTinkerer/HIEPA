@@ -229,17 +229,11 @@ def process(lines):
                     # MPEEK - Get the top of stack without popping
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmpeek\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 0:
-                            pmsg(ERROR, f"Expected 0 arguments to !mpeek, got {len(args)}", line)
-                        elif len(mac_stack) == 0:
+                        if len(mac_stack) == 0:
                             pmsg(ERROR, "Attempted peek from empty macro stack", line)
                         else:
                             val = mac_stack[-1]
-                            if list(val.values())[0] == None: # No label given in mpush, don't convert line
-                                temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}"
-                            else:   # Replace !mpeek with a label
-                                temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{list(val.values())[0]}"
+                            temp_lines[i] = re.sub(rf"{ASM_MACRO_CHAR}\bmpeek\b", list(val.values())[0], temp_lines[i])
                         continue
 
                     # MPEEK_KEY - Get the top key on the stack without popping
@@ -249,7 +243,7 @@ def process(lines):
                         if len(args) != 0:
                             pmsg(ERROR, f"Expected 0 arguments to !mpeek_key, got {len(args)}", line)
                         elif len(mac_stack) == 0:
-                            pmsg(ERROR, "Attempted peek from empty macro stack", line)
+                            pmsg(ERROR, "Attempted peek key from empty macro stack", line)
                         else:
                             val = mac_stack[-1]
                             temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{list(val.keys())[0]}"
@@ -269,6 +263,23 @@ def process(lines):
                                 pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
                             else: # Hide line from assembler
                                 temp_lines[i] = ""
+                        continue
+
+
+                    # MROT - Rotate the top three elements on the macro stack ( 1 2 3 ==> 2 3 1)
+                    match = re.search(rf"{ASM_MACRO_CHAR}\bmrot\b", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        args = temp_lines[i][match.span()[1]:].split()
+                        if len(args) != 0:
+                            pmsg(ERROR, f"Expected 0 arguments to !mrot, got {len(args)}", line)
+                        elif len(mac_stack) < 3:
+                            pmsg(ERROR, "Attempted rotate on short macro stack", line)
+                        else:
+                            val = mac_stack[-3]
+                            mac_stack[-3] = mac_stack[-2]
+                            mac_stack[-2] = mac_stack[-1]
+                            mac_stack[-1] = val
+                            temp_lines[i] = "" # Hide line from assembler
                         continue
 
                     # MSWAP - Swap the top two elements on the macro stack
