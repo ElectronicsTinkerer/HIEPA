@@ -155,6 +155,10 @@ Need to check if a part of your if structures is reached when it shouldn't?
 !macro MAC_7 @arg {
     !if @arg == INVALID_VALUE
         !fail [error message]
+    !else
+        !if @arg == MEH
+            !warn The value was just meh.
+        !endif
     !endif
 }
 ```

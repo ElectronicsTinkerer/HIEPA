@@ -159,7 +159,7 @@ def process(lines):
                     if len(parts) < 2:
                         pmsg(ERROR, f"Macro '{mac.name}' expected args but none were given", line)
                     else:
-                        args = parts[1].split(',')
+                        args = parts[1].split() # ','
                 elif len(mac.args) == 0 and len(parts) > 1:
                     pmsg(ERROR, f"Macro '{mac.name}' expected no arguments but some were given", line)
 
@@ -191,11 +191,14 @@ def process(lines):
                     for l in local_labels.keys():
                         temp_lines[i] = re.sub(rf"\b{l}\b", local_labels[l], temp_lines[i])
 
-                # Handle macro stack operations
+                # Handle macro stack and conditional assembly operations
+                block_level = 0
+                block_use_stack = []
                 for i in range(len(temp_lines)):
                     # MPEEK and MPEEK_KEY must be first in the order of operations
                     # This is to guarantee the ability to substitute a popped value into the
                     # other stack operators
+
                     # MPEEK - Get the top of stack without popping
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmpeek\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
@@ -203,161 +206,162 @@ def process(lines):
                             pmsg(ERROR, "Attempted peek from empty macro stack", line)
                         else:
                             val = mac_stack[-1]
-                            temp_lines[i] = re.sub(rf"{ASM_MACRO_CHAR}\bmpeek\b", list(val.values())[0], temp_lines[i])
+                            temp_lines[i] = re.sub(rf"{ASM_MACRO_CHAR}\bmpeek\b", str(list(val.values())[0]), temp_lines[i])
                         # continue
 
                     # MPEEK_KEY - Get the top key on the stack without popping
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmpeek_key\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 0:
-                            pmsg(ERROR, f"Expected 0 arguments to !mpeek_key, got {len(args)}", line)
-                        elif len(mac_stack) == 0:
+                        if len(mac_stack) == 0:
                             pmsg(ERROR, "Attempted peek key from empty macro stack", line)
                         else:
                             val = mac_stack[-1]
-                            temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{list(val.keys())[0]}"
+                            temp_lines[i] = re.sub(rf"{ASM_MACRO_CHAR}\bmpeek_key\b", str(list(val.keys())[0]), temp_lines[i])
                         # continue
 
                     # MPOP
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmpop\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 1:
-                            pmsg(ERROR, f"Expected 1 argument to !mpop, got {len(args)}", line)
-                        elif len(mac_stack) == 0:
-                            pmsg(ERROR, "Attempted pop from empty macro stack", line)
-                        else:
-                            val = mac_stack.pop()
-                            if not args[0] in val:
-                                pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
-                            elif val[args[0]] == None: # No label given in mpush, don't convert line
-                                temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}"
-                            else:   # Replace !mpop with a label
-                                temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{val[args[0]]}"
-                        continue
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(args) != 1:
+                                pmsg(ERROR, f"Expected 1 argument to !mpop, got {len(args)}", line)
+                            elif len(mac_stack) == 0:
+                                pmsg(ERROR, "Attempted pop from empty macro stack", line)
+                            else:
+                                val = mac_stack.pop()
+                                if not args[0] in val:
+                                    pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
+                                elif val[args[0]] == None: # No label given in mpush, don't convert line
+                                    temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}"
+                                else:   # Replace !mpop with a label
+                                    temp_lines[i] = f"{temp_lines[i][:match.span()[0]]}{val[args[0]]}"
+                            continue
 
                     # MPUSH
                     match = re.search(rf"^{ASM_MACRO_CHAR}\bmpush\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        len_args = len(args)
-                        if len_args < 1 or len_args > 2:
-                            pmsg(ERROR, f"Expected 1-2 arguments for !mpush, got {len_args}", line)
-                        else:
-                            elem = {args[0]:None}
-                            if len_args == 2:
-                                elem[args[0]] = args[1] # Assign value to label name
-                            mac_stack.append(elem)
-                            temp_lines[i] = ""
-                        continue
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            len_args = len(args)
+                            if len_args < 1 or len_args > 2:
+                                pmsg(ERROR, f"Expected 1-2 arguments for !mpush, got {len_args}", line)
+                            else:
+                                elem = {args[0]:None}
+                                if len_args == 2:
+                                    elem[args[0]] = args[1] # Assign value to label name
+                                mac_stack.append(elem)
+                                temp_lines[i] = ""
+                            continue
 
                     # MTEST - Check the top of the stack without popping (basically an ASSERT)
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmtest\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 1:
-                            pmsg(ERROR, f"Expected 1 argument to !mtest, got {len(args)}", line)
-                        elif len(mac_stack) == 0:
-                            pmsg(ERROR, "Attempted test on empty macro stack", line)
-                        else:
-                            val = mac_stack[-1]
-                            if not args[0] in val:
-                                pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
-                            else: # Hide line from assembler
-                                temp_lines[i] = ""
-                        continue
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(args) != 1:
+                                pmsg(ERROR, f"Expected 1 argument to !mtest, got {len(args)}", line)
+                            elif len(mac_stack) == 0:
+                                pmsg(ERROR, "Attempted test on empty macro stack", line)
+                            else:
+                                val = mac_stack[-1]
+                                if not args[0] in val:
+                                    pmsg(ERROR, f"Mismatched macro stack key identifier. Got '{args[0]}' but expected '{list(val.keys())[0]}'", line)
+                                else: # Hide line from assembler
+                                    temp_lines[i] = ""
+                            continue
 
                     # MROT - Rotate the top three elements on the macro stack ( 1 2 3 ==> 2 3 1)
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmrot\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 0:
-                            pmsg(ERROR, f"Expected 0 arguments to !mrot, got {len(args)}", line)
-                        elif len(mac_stack) < 3:
-                            pmsg(ERROR, "Attempted rotate on short macro stack", line)
-                        else:
-                            val = mac_stack[-3]
-                            mac_stack[-3] = mac_stack[-2]
-                            mac_stack[-2] = mac_stack[-1]
-                            mac_stack[-1] = val
-                            temp_lines[i] = "" # Hide line from assembler
-                        continue
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(args) != 0:
+                                pmsg(ERROR, f"Expected 0 arguments to !mrot, got {len(args)}", line)
+                            elif len(mac_stack) < 3:
+                                pmsg(ERROR, "Attempted rotate on short macro stack", line)
+                            else:
+                                val = mac_stack[-3]
+                                mac_stack[-3] = mac_stack[-2]
+                                mac_stack[-2] = mac_stack[-1]
+                                mac_stack[-1] = val
+                                temp_lines[i] = "" # Hide line from assembler
+                            continue
 
                     # MSWAP - Swap the top two elements on the macro stack
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmswap\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 0:
-                            pmsg(ERROR, f"Expected 0 arguments to !mswap, got {len(args)}", line)
-                        elif len(mac_stack) < 2:
-                            pmsg(ERROR, "Attempted swap on short macro stack", line)
-                        else:
-                            val = mac_stack[-1]
-                            mac_stack[-1] = mac_stack[-2]
-                            mac_stack[-2] = val
-                            temp_lines[i] = "" # Hide line from assembler
-                        continue
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(args) != 0:
+                                pmsg(ERROR, f"Expected 0 arguments to !mswap, got {len(args)}", line)
+                            elif len(mac_stack) < 2:
+                                pmsg(ERROR, "Attempted swap on short macro stack", line)
+                            else:
+                                val = mac_stack[-1]
+                                mac_stack[-1] = mac_stack[-2]
+                                mac_stack[-2] = val
+                                temp_lines[i] = "" # Hide line from assembler
+                            continue
 
-                    # MDUP - Duplicate a stack item at an index to the top of the stack
+                    # MDUPI - Duplicate a stack item at an index to the top of the stack
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmdupi\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 1:
-                            pmsg(ERROR, f"Expected 1 argument to !mdupi, got {len(args)}", line)
-                        if not args[0].isdigit():
-                            pmsg(ERROR, f"Expected base-10 number for !mdupi, got '{args[0]}'", line)
-                        val = int(args[0], 10)
-                        if len(mac_stack) < val+1:
-                            pmsg(ERROR, "Attempted dupi on short macro stack", line)
-                        else:
-                            mac_stack.append(mac_stack[-val-1])
-                            temp_lines[i] = "" # Hide line from assembler
-                        continue
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(args) != 1:
+                                pmsg(ERROR, f"Expected 1 argument to !mdupi, got {len(args)}", line)
+                            if not args[0].isdigit():
+                                pmsg(ERROR, f"Expected base-10 number for !mdupi, got '{args[0]}'", line)
+                            val = int(args[0], 10)
+                            if len(mac_stack) < val+1:
+                                pmsg(ERROR, "Attempted dupi on short macro stack", line)
+                            else:
+                                mac_stack.append(mac_stack[-val-1])
+                                temp_lines[i] = "" # Hide line from assembler
+                            continue
 
                     # MDROP - Remove the top element from the macro stack
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmdrop\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 0:
-                            pmsg(ERROR, f"Expected 0 arguments to !mdrop, got {len(args)}", line)
-                        elif len(mac_stack) == 0:
-                            pmsg(ERROR, "Attempted drop from empty macro stack", line)
-                        else:
-                            mac_stack.pop()
-                            temp_lines[i] = ""
-                        continue
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(args) != 0:
+                                pmsg(ERROR, f"Expected 0 arguments to !mdrop, got {len(args)}", line)
+                            elif len(mac_stack) == 0:
+                                pmsg(ERROR, "Attempted drop from empty macro stack", line)
+                            else:
+                                mac_stack.pop()
+                                temp_lines[i] = ""
+                            continue
 
                     # MSTACKDUMP - Print the entire macro stack
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmstackdump\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 0:
-                            pmsg(ERROR, f"Expected 0 arguments to !mstackdump, got {len(args)}", line)
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(args) != 0:
+                                pmsg(ERROR, f"Expected 0 arguments to !mstackdump, got {len(args)}", line)
 
-                        dump_text = "MACRO STACK DUMP:\n"
-                        for f in mac_stack:
-                            key = list(f.keys())[0]
-                            val = list(f.values())[0]
-                            l = len(key)
-                            dump_text += f"{key} {(16-l)*'.'} : {val}\n"
+                            dump_text = "MACRO STACK DUMP:\n"
+                            for f in mac_stack:
+                                key = str(list(f.keys())[0])
+                                val = list(f.values())[0]
+                                l = len(key)
+                                dump_text += f"{key} {(16-l)*'.'} : {val}\n"
 
-                        pmsg(INFO, dump_text, line)
+                            pmsg(INFO, dump_text, line)
 
-                        temp_lines[i] = ""
-                        continue
+                            temp_lines[i] = ""
+                            continue
 
-                # Handle macro IF/ELSE/ENDIF/FAIL/VAR/IFVAR operators
-                block_level = 0
-                block_use_stack = []
-                for i in range(len(temp_lines)):
                     # IF
                     match = re.search(f"^{ASM_MACRO_CHAR}\W*if\W+", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
                         len_args = len(args)
                         if len_args != 3:
-                            print("DUMMY", temp_lines[i])
                             pmsg(ERROR, f"Expected 3 arguments to !if, got {len(args)}", line)
                         else:
                             block_level += 1
@@ -451,35 +455,47 @@ def process(lines):
                             else:
                                 pmsg(ERROR, f"Encountered !FAIL", line)
 
+                    # WARN
+                    match = re.search(f"^{ASM_MACRO_CHAR}\W*warn", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            msg = temp_lines[i][match.span()[1]:].strip()
+                            if msg != "":
+                                pmsg(WARN, f"Encountered !WARN\n\tMessage: '{msg}'", line)
+                            else:
+                                pmsg(WARN, f"Encountered !WARN", line)
+                            temp_lines[i] = ""
+                            continue
+
                     # SETVAR
                     match = re.search(f"^{ASM_MACRO_CHAR}\W*setvar", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        len_args = len(args)
-                        if len_args != 2:
-                            pmsg(ERROR, f"Expected 2 arguments to !setvar, got {len(args)}", line)
-                        else:
-                            mac_vars[args[0]] = args[1]
-                            temp_lines[i] = ""
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            len_args = len(args)
+                            if len_args != 2:
+                                pmsg(ERROR, f"Expected 2 arguments to !setvar, got {len(args)}", line)
+                            else:
+                                mac_vars[args[0]] = args[1]
+                                temp_lines[i] = ""
 
                     # MVARDUMP - Print all macro variables
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmvardump\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
-                        args = temp_lines[i][match.span()[1]:].split()
-                        if len(args) != 0:
-                            pmsg(ERROR, f"Expected 0 arguments to !mvardump, got {len(args)}", line)
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(args) != 0:
+                                pmsg(ERROR, f"Expected 0 arguments to !mvardump, got {len(args)}", line)
 
-                        dump_text = "MACRO VARIABLE DUMP:\n"
-                        for (key, val) in mac_vars.items():
-                            # key = list(f.keys())[0]
-                            # val = list(f.values())[0]
-                            l = len(key)
-                            dump_text += f"{key} {(16-l)*'.'} : {val}\n"
+                            dump_text = "MACRO VARIABLE DUMP:\n"
+                            for (key, val) in mac_vars.items():
+                                l = len(key)
+                                dump_text += f"{key} {(16-l)*'.'} : {val}\n"
 
-                        pmsg(INFO, dump_text, line)
+                            pmsg(INFO, dump_text, line)
 
-                        temp_lines[i] = ""
-                        continue
+                            temp_lines[i] = ""
+                            continue
 
                     # Done checking for structure, now handle including of lines
                     if block_level > 0 and not block_use_stack[-1]:

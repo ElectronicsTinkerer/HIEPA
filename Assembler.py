@@ -1047,8 +1047,10 @@ if __name__ == "__main__":
     for i in range(rom_size):
         rom_contents.append(0)
 
+    pmsg(INFO, f"{Style.BRIGHT}{Fore.MAGENTA}*** Starting Preprocessor ***{Style.RESET_ALL}")
     file_contents = Preprocessor.preprocess(in_file, base_dir)  # Stores the lines of source
 
+    pmsg(INFO, f"{Style.BRIGHT}{Fore.MAGENTA}*** Starting Macro Expansion ***{Style.RESET_ALL}")
     file_contents = Macro.process(file_contents)  # Stores the lines of source
 
     if pplisting_file != "":

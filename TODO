@@ -13,6 +13,7 @@
 * Add ability to specify location where `#load`ed functions get placed (and which ones are loaded)
 * Add preprocessor `#load "file.inc" blocks x@$f000, y@myLabel, z@45809` directive which is like a python `from filename import x, y, z`
 * Add `#beginblock <name>`/`#endblock` preprocessor directives for selectively `#load`ing in blocks
+* Add per-line redefining ability of enum member values
 
 ## Code Improvements
 

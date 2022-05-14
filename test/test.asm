@@ -119,6 +119,11 @@ __go2:
     !endif
     !endif
     !endif
+    !if !mpeek_key != test3
+        !mpush test 4
+    !else
+        !warn Else works!
+    !endif
 }
 
 !macro MSTACKVARS {
