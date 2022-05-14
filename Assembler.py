@@ -1079,7 +1079,7 @@ if __name__ == "__main__":
         needs_another_pass = False
         al = False
         xl = False
-        pc = 0
+        pc = -1
         pmsg(INFO, f"{Style.BRIGHT}{Fore.MAGENTA}*** Starting pass #{pass_num} ***{Style.RESET_ALL}")
 
         for line in file_contents:
@@ -1129,7 +1129,10 @@ if __name__ == "__main__":
             for line in file_contents:
                 printed_line = False
                 line_width = 7
-                lf.write(f"{line.pc:06X}:")     # Print the address
+                if line.pc < 0:
+                    lf.write("??????:")
+                else:
+                    lf.write(f"{line.pc:06X}:")     # Print the address
                 for byt in line.rawbytes:       # Print the bytes
                     lf.write(f" {byt:02X}")
                     line_width += 3

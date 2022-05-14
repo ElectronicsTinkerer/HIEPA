@@ -23,7 +23,11 @@
 DeprecationWarning: invalid escape sequence '\>'
   for s in bytes(num[1:-1], "utf_8").decode("unicode_escape"):    # Only works with values [0..127]
 ```
-
+* A trailing comma on an existing label (in usage) will not trigger an unresolved label issue:
+```
+label:
+  jmp label,
+```
 
 # DONE:
 

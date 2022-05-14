@@ -141,6 +141,7 @@ __go2:
     ROT
     MSTACKVARS
 mylabel:
+    jmp mylabel,
 lbl:
     lda #$00
 lbl2:
