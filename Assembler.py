@@ -1079,6 +1079,7 @@ if __name__ == "__main__":
         needs_another_pass = False
         al = False
         xl = False
+        pc = 0
         pmsg(INFO, f"{Style.BRIGHT}{Fore.MAGENTA}*** Starting pass #{pass_num} ***{Style.RESET_ALL}")
 
         for line in file_contents:
