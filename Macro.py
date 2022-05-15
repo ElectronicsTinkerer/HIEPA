@@ -504,6 +504,11 @@ def process(lines):
                 if block_level != 0:
                     pmsg(ERROR, "Unbalanced macro stack at end", line)
 
+                # Get indentation level of original line (for listing file)
+                indent = re.search("^\W*", line.line).span()[1]
+
+                # Handle line replacement for returning to the assembler
+                spacing = 32 # Spaces from start of indent block to mac expansion comment
                 line.ismacdef = True # Ignore original line in assembler
                 line.line = f";{line.line[1:]}"
                 for l in temp_lines:
@@ -511,7 +516,12 @@ def process(lines):
                         continue
                     tline = FileLine.dupfileline(line)
                     tline.ppline = l
-                    tline.line = f"    {l}{(20 - len(l))*' '}; MAC expansion of '{mac.name}'"
+                    ind = indent
+                    spa = spacing
+                    if l[:2] == "__":   # Unindent labels one level
+                        ind -= 4
+                        spa += 4
+                    tline.line = f"{' '*ind}{l}{(spa - len(l))*' '}; MAC expansion of '{mac.name}'"
                     tline.ismacdef = False
                     new_lines.append(tline)
 
