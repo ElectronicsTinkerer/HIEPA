@@ -175,7 +175,8 @@ def process(lines):
                 temp_lines = mac.lines.copy()
                 for i in range(len(mac.lines)):
                     for j in range(len(mac.args)):
-                        temp_lines[i] = re.sub(mac.args[j], args[j], temp_lines[i])
+                        print(mac.args[j], args[j], repr(args[j]))
+                        temp_lines[i] = re.sub(mac.args[j], repr(args[j])[1:-1], temp_lines[i]) # Note the (terrible) use of repr[1:-1]
 
                 # Find local labels
                 local_labels = {}
@@ -196,7 +197,7 @@ def process(lines):
                 block_use_stack = []
                 for i in range(len(temp_lines)):
                     # MPEEK and MPEEK_KEY must be first in the order of operations
-                    # This is to guarantee the ability to substitute a popped value into the
+                    # This is to guarantee the ability to substitute a peeked value into the
                     # other stack operators
 
                     # MPEEK - Get the top of stack without popping
@@ -357,11 +358,12 @@ def process(lines):
                             continue
 
                     # IF
-                    match = re.search(f"^{ASM_MACRO_CHAR}\W*if\W+", temp_lines[i], flags=re.IGNORECASE)
+                    match = re.search(rf"^{ASM_MACRO_CHAR}\bif\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
                         len_args = len(args)
                         if len_args != 3:
+                            print(args, temp_lines[i])
                             pmsg(ERROR, f"Expected 3 arguments to !if, got {len(args)}", line)
                         else:
                             block_level += 1
@@ -383,7 +385,7 @@ def process(lines):
                         continue
 
                     # IFVAR
-                    match = re.search(f"^{ASM_MACRO_CHAR}\W*ifvar", temp_lines[i], flags=re.IGNORECASE)
+                    match = re.search(rf"^{ASM_MACRO_CHAR}\bifvar\b", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
                         len_args = len(args)
@@ -414,7 +416,7 @@ def process(lines):
                         continue
 
                     # ENDIF
-                    match = re.search(f"^{ASM_MACRO_CHAR}\W*endif", temp_lines[i], flags=re.IGNORECASE)
+                    match = re.search(rf"^{ASM_MACRO_CHAR}\bendif", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
                         len_args = len(args)
@@ -429,7 +431,7 @@ def process(lines):
                         continue
 
                     # ELSE
-                    match = re.search(f"^{ASM_MACRO_CHAR}\W*else", temp_lines[i], flags=re.IGNORECASE)
+                    match = re.search(rf"^{ASM_MACRO_CHAR}\belse", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         args = temp_lines[i][match.span()[1]:].split()
                         len_args = len(args)
@@ -446,7 +448,7 @@ def process(lines):
                         continue
 
                     # FAIL
-                    match = re.search(f"^{ASM_MACRO_CHAR}\W*fail", temp_lines[i], flags=re.IGNORECASE)
+                    match = re.search(rf"^{ASM_MACRO_CHAR}\bfail", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
                             msg = temp_lines[i][match.span()[1]:].strip()
@@ -456,7 +458,7 @@ def process(lines):
                                 pmsg(ERROR, f"Encountered !FAIL", line)
 
                     # WARN
-                    match = re.search(f"^{ASM_MACRO_CHAR}\W*warn", temp_lines[i], flags=re.IGNORECASE)
+                    match = re.search(rf"^{ASM_MACRO_CHAR}\bwarn", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
                             msg = temp_lines[i][match.span()[1]:].strip()
@@ -468,7 +470,7 @@ def process(lines):
                             continue
 
                     # SETVAR
-                    match = re.search(f"^{ASM_MACRO_CHAR}\W*setvar", temp_lines[i], flags=re.IGNORECASE)
+                    match = re.search(rf"^{ASM_MACRO_CHAR}\bsetvar", temp_lines[i], flags=re.IGNORECASE)
                     if match:
                         if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
                             args = temp_lines[i][match.span()[1]:].split()

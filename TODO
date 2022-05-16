@@ -50,4 +50,4 @@ label:
   -> Fix: This results in a warning that the addressing mode may not be what the programmer intended.
 * If a symbol is unresolved when put into a .word directive, assembler prints warning that it is > 0xffff (when it should not)
 * Is symbol is < $100 and instruction does not have a ZP mode, an invalid addressing mode ERROR is thrown (when it should promote the value to abs addressing if available)
-  
+* An escaped char literal as an argument to a macro gets interpreted instead of being passed as the escape string.
