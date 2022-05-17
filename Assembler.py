@@ -711,6 +711,7 @@ def parseargs(i, line, sym):
 # Escapes a string
 def escapestr(string):
     return string.replace("\\r", "\r") \
+                .replace("\\0", chr(0)) \
                 .replace("\\n", "\n") \
                 .replace("\\t", "\t") \
                 .replace("^G", chr(7)) \

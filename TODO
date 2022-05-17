@@ -52,3 +52,4 @@ label:
 * Is symbol is < $100 and instruction does not have a ZP mode, an invalid addressing mode ERROR is thrown (when it should promote the value to abs addressing if available)
 * An escaped char literal as an argument to a macro gets interpreted instead of being passed as the escape string.
 * Cannot load immediate (EX: lda #'-') with a character that is a math operator
+* Escape characters do not work in character literals: '\0' becomes $5C
