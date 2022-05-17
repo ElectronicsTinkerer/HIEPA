@@ -254,7 +254,7 @@ def calcrel16(from_addr, to_addr):
 def parsenum(string):
     global re_symbol_table
     global line_num
-    # print(f"PARSENUM: '{string}'")
+    print(f"PARSENUM: '{string}'")
     string = string.strip()
     if len(string) < 1:
         pmsg(ERROR, f"Expected operand", file_contents[line_num-1])
@@ -300,7 +300,7 @@ def parsenum(string):
                 elif len(string) > so + 2:
                     val = ord(string[so+1])
                 else:
-                    pmsg(ERROR, f"Expression missing closing character", file_contents[line_num-1])
+                    pmsg(ERROR, f"Literal missing closing character", file_contents[line_num-1])
             else:
                 val = getsym(string)
         # else:
@@ -319,7 +319,7 @@ def parsenum(string):
 # Preforms an operation on a string and accumulator, returns the results.
 # ONLY for use by the parseexp() function
 def performop(op, current_str, accumulator):
-    # print(f"PerformOP: '{op}':'{current_str}'")
+    print(f"PerformOP: '{op}':'{current_str}'")
     # if i < len(str)-1 and ((character == "<" and str[i] == "<") or (character == ">" and str[i] == ">")):
     if op in [">", "<"]:
         op = 2 * op
@@ -418,8 +418,9 @@ def parseexp(string, starts_with_paren=False):
             return accumulator
 
         # Perform operations on numbers
-        if character in MATH_OPS or (character in MATH_ALT_OPS and i < len(string)-1 and string[i+1].strip() == "") \
-            or (character in (">", "<") and i < len(string)-1 and string[i+1] in (">", "<")):
+        if (character in MATH_OPS or (character in MATH_ALT_OPS and i < len(string)-1 and string[i+1].strip() == "") \
+            or (character in (">", "<") and i < len(string)-1 and string[i+1] in (">", "<"))) \
+            and not (i > 0 and string[i-1] in ("'", '"')):
 
             accumulator = performop(next_op, current_str, accumulator)
             if accumulator == SYMVALUNK:

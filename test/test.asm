@@ -195,7 +195,7 @@ secondlabel:
 
     ; clc 5               ; Invalid addressing mode
     jmp 5               ; jmp does not have a dp mode, make sure abs is assumed
-    ; ldx #'-'
+    ldx #'*'
 
     BEGIN_AGAIN
         IF_EQ
