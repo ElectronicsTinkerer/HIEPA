@@ -55,10 +55,18 @@ Want to use the assembler's internal macro stack?
     ; Stack: 1 2 3
 }
 
+; Top pop inlined off the stack, use !mpopd
+!macro MAC_21 {
+    ; Stack: 1 2 3 4
+    ; Below expands to `4 .equ 3`
+    !mpopd .equ !mpeek
+    ; Stack: 1 2 3
+}
+
 ; To check if a macro is within another block, use !mtest
 !macro MAC_3 {
     ; Stack: 1 2 3 4
-    !mtest frame_name
+    !mtest 4
     ; Stack: 1 2 3 4
 }
 

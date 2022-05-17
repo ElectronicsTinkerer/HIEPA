@@ -254,7 +254,7 @@ def calcrel16(from_addr, to_addr):
 def parsenum(string):
     global re_symbol_table
     global line_num
-    print(f"PARSENUM: '{string}'")
+    # print(f"PARSENUM: '{string}'")
     string = string.strip()
     if len(string) < 1:
         pmsg(ERROR, f"Expected operand", file_contents[line_num-1])
@@ -319,7 +319,7 @@ def parsenum(string):
 # Preforms an operation on a string and accumulator, returns the results.
 # ONLY for use by the parseexp() function
 def performop(op, current_str, accumulator):
-    print(f"PerformOP: '{op}':'{current_str}'")
+    # print(f"PerformOP: '{op}':'{current_str}'")
     # if i < len(str)-1 and ((character == "<" and str[i] == "<") or (character == ">" and str[i] == ">")):
     if op in [">", "<"]:
         op = 2 * op
