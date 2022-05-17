@@ -159,7 +159,8 @@ def process(lines):
                     if len(parts) < 2:
                         pmsg(ERROR, f"Macro '{mac.name}' expected args but none were given", line)
                     else:
-                        args = parts[1].split() # ','
+                        # args = parts[1].split() # ','
+                        args = re.split("\s+(?![^\(]*\))", parts[1]) # Don't split on whitespace inside single level ()'s
                 elif len(mac.args) == 0 and len(parts) > 1:
                     pmsg(ERROR, f"Macro '{mac.name}' expected no arguments but some were given", line)
 
@@ -175,7 +176,6 @@ def process(lines):
                 temp_lines = mac.lines.copy()
                 for i in range(len(mac.lines)):
                     for j in range(len(mac.args)):
-                        print(mac.args[j], args[j], repr(args[j]))
                         temp_lines[i] = re.sub(mac.args[j], repr(args[j])[1:-1], temp_lines[i]) # Note the (terrible) use of repr[1:-1]
 
                 # Find local labels
@@ -196,9 +196,25 @@ def process(lines):
                 block_level = 0
                 block_use_stack = []
                 for i in range(len(temp_lines)):
-                    # MPEEK and MPEEK_KEY must be first in the order of operations
+                    # MPEEK and MPEEK_KEY must come after MPOPD in the order of operations
                     # This is to guarantee the ability to substitute a peeked value into the
-                    # other stack operators
+                    # other stack operators and for popd to substitute before the substitution
+                    # performed by peek
+
+                    # MPOPD - Macro Pop (and Don't care about key)
+                    match = re.search(rf"{ASM_MACRO_CHAR}\bmpopd\b", temp_lines[i], flags=re.IGNORECASE)
+                    if match:
+                        if block_level == 0 or (block_level > 0 and block_use_stack[-1]):
+                            args = temp_lines[i][match.span()[1]:].split()
+                            if len(mac_stack) == 0:
+                                pmsg(ERROR, "Attempted popa from empty macro stack", line)
+                            else:
+                                val = mac_stack.pop()   # Replace !mpop with a some string
+                                s = str(list(val.values())[0])
+                                if s == None:
+                                    s = ""
+                                temp_lines[i] = re.sub(rf"{ASM_MACRO_CHAR}\bmpopd\b", s, temp_lines[i])
+                            # continue
 
                     # MPEEK - Get the top of stack without popping
                     match = re.search(rf"{ASM_MACRO_CHAR}\bmpeek\b", temp_lines[i], flags=re.IGNORECASE)

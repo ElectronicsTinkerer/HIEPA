@@ -28,6 +28,7 @@ DeprecationWarning: invalid escape sequence '\>'
 label:
   jmp label,
 ```
+* Need to improve macro argument splitting to not split on nested ()'s - it currently only supports 1 level
 
 # DONE:
 
