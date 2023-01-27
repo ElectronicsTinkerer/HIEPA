@@ -7,7 +7,7 @@ HIEPA is a semi-advanced macro assembler for the 65816 CPU, written in python. A
 * Hidden symbols (start with an `_`)
 * Symbol table export as an includable header
 * Include files
-* Preprocessor `ifdef/ifndef /end` guards
+* Preprocessor `ifdef/ifndef/endif` guards
 * Preprocessor `define/undef`
 * Binary, octal, decimal, hexadecimal number bases
 * Infix and postfix expressions
@@ -23,6 +23,10 @@ HIEPA is a semi-advanced macro assembler for the 65816 CPU, written in python. A
 ## Syntax
 
 Syntax is documented in the `SYNTAX.md` file. Basic assembly similar to other assemblers such as XA65 or DASM since that is what I started writing assembly with.
+
+## Running
+
+Python 3.7+ along with a few libraries (re/os/sys/getopt/colorama/datetime) are needed to run the assembler. The main file is `Assember.py`. If run without any arguments, the help menu will be displayed which shows the various flags that can be passed to the assembler.
 
 ## License
 
