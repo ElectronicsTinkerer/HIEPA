@@ -1,5 +1,5 @@
 # Python-based 65816 assembler
-# Zach Baldwin 2021-2022
+# Zach Baldwin 2021-2023
 
 # Libraries
 import re
@@ -982,7 +982,7 @@ if __name__ == "__main__":
 
     print("HIEPA: The Highly InEfficient Python Assembler")
     print("              for the 65816 CPU               ")
-    print("            Zach Baldwin Fall 2021            ")
+    print("        (C) Zach Baldwin 2021 - 2023          ")
     print("")
 
     if len(sys.argv) == 1:

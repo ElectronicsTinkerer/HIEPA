@@ -1,5 +1,9 @@
 # TODO
 
+## Generic
+
+* Improve documentation
+
 ## Functional Stuff (Features)
 
 * Add support for byte selection operators on 16 bit values
@@ -14,7 +18,8 @@
 * Add preprocessor `#load "file.inc" blocks x@$f000, y@myLabel, z@45809` directive which is like a python `from filename import x, y, z`
 * Add `#beginblock <name>`/`#endblock` preprocessor directives for selectively `#load`ing in blocks
 * Add per-line redefining ability of enum member values
-
+* Add `LIST ON` and `LIST OFF` directives
+  
 ## Code Improvements
 
 * If '\>' is put in a string literal, the following is output during (a successful) assemblation:
