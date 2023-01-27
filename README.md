@@ -1,6 +1,8 @@
 # HIEPA: The Highly InEfficient Python Assembler (for the 65816)
 
-## HIEPA is a semi-advanced macro assembler for the 65816 CPU, written in python. Among its features are:
+## Features
+
+HIEPA is a semi-advanced macro assembler for the 65816 CPU, written in python. Among its features are:
 
 * Hidden symbols (start with an `_`)
 * Symbol table export as an includable header
