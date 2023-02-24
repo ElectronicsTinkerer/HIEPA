@@ -1,13 +1,73 @@
 # Syntax Overview for use in Assembly Files
 
+**Starting a file**
+
+All files must have a `.org` directive before any generatable code so the assembler knows the ROM's base address.
+
 **Postfix Notation**
+
 EX: `{ arg1 arg2 + arg3 - }`
+
 Rules:
 
 * There MUST be whitespace on either side of each token in a postfix expression block
 
+**Infix Notation**
+
+Infix notation is supported, however, expressions are evaluated left to right and not by standard precedence rules.
+
+EX: `5 + 9 * 4` results in `56`
+
+**Inserting the current date**
+
+The `.date` directive will insert the current date and time as a UTF-8 string at the address the directive is found.
+
+**Incremental build numbers**
+
+The `.build` directive inserts a 6-byte long UTF-8 string in decimal of the current build number. Only useful if a `--build` file is specified.
+
+**Switching register widths**
+
+The perceived register widths for the A and X registers (internal to the assembler) can be switched with the following directives:
+
+* `.al` - set all Accumulator-based operations to 16 bit
+* `.as` - set all Accumulator-based operations to 8 bit
+* `.xl` - set all Index-register-based operations to 16 bit
+* `.xs` - set all Index-register-based operations to 8 bit
+
+These directives not emit any binary code. They are solely for the assembler. Use `rep`/`sep` to modify the processor's status register.
+
+**EQUates**
+
+Equates give a convenient way to define constants, such as I/O addresses.
+
+EX: `MY_SYMBOL .equ $50`
+
+**Number Formats**
+
+| Base | Example   |
+| ---- | --------- |
+| 2    | %00110101 |
+| 8    | &065      |
+| 10   | 53        |
+| 16   | $35       |
+
+**Getting the curent PC**
+
+Sometimes, you want to get the current PC of an instruction (such as `bcc $PC`). HIEPA supports two common forms syntax to accomplish this:\
+
+* `bcc .`
+* `bcc $`
+
+**Hints**
+
+* To avoid the parentheses around a macro from interfering with addressing mode detection (such as indirect addressing), a `~` may be placed directly before an opening parenthesis. EX: `#define MAC ~($12ff)`
+* `.byt` and `.byte` encode strings at UTF-8 but `.word` encodes data strings as UTF-16.
+
 **Preprocessor Macros**
+
 EX: `#define MAC ($12ff + OTHER_MAC) ; comment`
+
 Rules:
 
 * Comments at end of line are ignored
@@ -35,7 +95,7 @@ Notes:
 * Arguments are optional but must be prepended with a `@`. If there are no arguments, then just don't put them in the definition.
 * Macro names must not have spaces
 * Macros cannot contain other macros
-* Macro expansion does support forward referenced macros
+* Macro expansion does support forward referenced macros (CHECK THIS - TODO)
 * Macros support local labels. Any labels defined in a macro that start with `__` are considered to be local to the macro's expansion
 
 Want to use the assembler's internal macro stack?
@@ -212,19 +272,3 @@ Notes:
   * Start with an `=`
   * Contain no whitespace (so postfix expressions are not allowed)
 * If no base starting value is given, the enum will start from 0 and increment by 1 for each key. Otherwise, it will start with the base value and increment from that.
-
-**Hints**
-
-* To avoid the parentheses around a macro from interfering with addressing mode detection (such as indirect addressing), a `~` may be placed directly before an opening parenthesis. EX: `#define MAC ~($12ff)`
-* `.byt` and `.byte` encode strings at UTF-8 but `.word` encodes data strings as UTF-16.
-* To access the current PC, use `$`
-
-**Number Formats**
-
-| Base | Example   |
-| ---- | --------- |
-| 2    | %00110101 |
-| 8    | &065      |
-| 10   | 53        |
-| 16   | $35       |
-
