@@ -345,7 +345,7 @@ def performop(op, current_str, accumulator):
     elif op == "*":
         return accumulator * parsenum(current_str)
     elif op == "/":
-        return accumulator / parsenum(current_str)
+        return int(accumulator / parsenum(current_str))
     elif op == "%":
         return accumulator % parsenum(current_str)
     elif op == ">>":

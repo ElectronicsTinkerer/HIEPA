@@ -54,7 +54,7 @@ EX: `MY_SYMBOL .equ $50`
 
 **Getting the curent PC**
 
-Sometimes, you want to get the current PC of an instruction (such as `bcc $PC`). HIEPA supports two common forms syntax to accomplish this:\
+Sometimes, you want to get the current PC of an instruction (such as `bcc $PC`). HIEPA supports two common forms syntax to accomplish this:
 
 * `bcc .`
 * `bcc $`
