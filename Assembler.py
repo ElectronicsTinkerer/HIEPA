@@ -363,11 +363,11 @@ def performop(op, current_str, accumulator):
 
 
 # Returns true if a character is an operation in a string
-def containsop(string, op):
-    if op in ("+", "-", "*", "/", "<<", ">>"):
-        return op in string
-    elif op == "%":
-        pass
+# def containsop(string, op):
+#     if op in ("+", "-", "*", "/", "<<", ">>"):
+#         return op in string
+#     elif op == "%":
+#         pass
 
 
 # Parses a normal expression. Expression ends on a non symbol, ',', or ')' character
@@ -797,6 +797,10 @@ def parseline(line):
             # Check for instructions
             elif sym.upper() in Instructions.INSTRUCTIONS:
 
+                # Make sure that an origin has been set
+                if pc == -1:
+                    pmsg(ERROR, "Missing ORG directive", file_contents[line_num-1])
+
                 # print("YES, found instruction")  # DEBUG
                 file_contents[line_num-1].rawbytes = []
                 for byte in parseargs(i, line, sym):
@@ -812,12 +816,20 @@ def parseline(line):
 
             # If it's a label, append it to the table
             elif c == ":":
+                # Make sure that an origin has been set
+                if pc == -1:
+                    pmsg(ERROR, "Missing ORG directive", file_contents[line_num-1])
+                    
                 addsym(sym, pc, pc, pc)
                 # print(f"Found Label: {sym} = ${pc:04X}")  # DEBUG
 
             # DataByte directive
             elif re.search(r"^.?byte?$", sym, flags=re.IGNORECASE):
 
+                # Make sure that an origin has been set
+                if pc == -1:
+                    pmsg(ERROR, "Missing ORG directive", file_contents[line_num-1])
+                    
                 # Allow comma-delimited values
                 nums = parsecsv(line[i+1:])
 
@@ -848,6 +860,10 @@ def parseline(line):
             # DataWord directive
             elif re.search(r"^.?word$", sym, flags=re.IGNORECASE):
 
+                # Make sure that an origin has been set
+                if pc == -1:
+                    pmsg(ERROR, "Missing ORG directive", file_contents[line_num-1])
+                    
                 # Allow comma-delimited values
                 nums = parsecsv(line[i+1:])
 
@@ -880,6 +896,10 @@ def parseline(line):
 
             # Date directive
             elif re.search(r"^.?date$", sym, flags=re.IGNORECASE):
+                # Make sure that an origin has been set
+                if pc == -1:
+                    pmsg(ERROR, "Missing ORG directive", file_contents[line_num-1])
+                    
                 for b in bytes(datetime.now().isoformat(timespec='minutes'), "utf_8").decode("unicode_escape"):
                     val = ord(b)
                     writerom8(pc, val)
@@ -888,6 +908,10 @@ def parseline(line):
 
             #BuildNum directive
             elif re.search(r"^.?build$", sym, flags=re.IGNORECASE):
+                # Make sure that an origin has been set
+                if pc == -1:
+                    pmsg(ERROR, "Missing ORG directive", file_contents[line_num-1])
+                    
                 for b in bytes(f"{build_num:06}", "utf_8").decode("unicode_escape"):
                     val = ord(b)
                     writerom8(pc, val)
